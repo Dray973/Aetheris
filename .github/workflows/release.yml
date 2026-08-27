@@ -81,8 +81,12 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $ver = $tag.TrimStart('v','V')
           if ([string]::IsNullOrWhiteSpace($ver)) { $ver = "0.0.0" }
+          # Publish binaries to a separate PUBLIC repo if configured (keeps the
+          # source repo private). Set the RELEASES_REPO repo variable to enable.
+          $repo = "${{ vars.RELEASES_REPO }}"
+          if ([string]::IsNullOrWhiteSpace($repo)) { $repo = "${{ github.repository }}" }
           $hash = (Get-FileHash artifacts\AetherisQuantumCore.exe -Algorithm SHA256).Hash.ToLower()
-          $url = "https://github.com/${{ github.repository }}/releases/latest/download/AetherisQuantumCore.exe"
+          $url = "https://github.com/$repo/releases/latest/download/AetherisQuantumCore.exe"
           $m = [ordered]@{ version = $ver; url = $url; notes = "Aetheris $tag"; sha256 = $hash }
           $m | ConvertTo-Json | Set-Content artifacts\version.json -Encoding ascii
           Get-Content artifacts\version.json
@@ -97,11 +101,15 @@ jobs:
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create ${{ github.ref_name }}
-          artifacts/AetherisQuantumCore.exe
-          artifacts/AetherisSetup.exe
-          artifacts/version.json
-          --title "Aetheris Quantum Core ${{ github.ref_name }}"
-          --generate-notes
+          # Use a PAT (RELEASES_TOKEN) to publish to the public releases repo;
+          # otherwise fall back to the built-in token on this repo.
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN != '' && secrets.RELEASES_TOKEN || github.token }}
+        run: |
+          $repo = "${{ vars.RELEASES_REPO }}"
+          $repoArg = if ([string]::IsNullOrWhiteSpace($repo)) { @() } else { @('--repo', $repo) }
+          gh release create ${{ github.ref_name }} `
+            artifacts/AetherisQuantumCore.exe `
+            artifacts/AetherisSetup.exe `
+            artifacts/version.json `
+            --title "Aetheris Quantum Core ${{ github.ref_name }}" `
+            --generate-notes @repoArg
