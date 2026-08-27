@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aetheris-quantum-core"
+version = "0.1.0"
+description = "Aetheris Quantum Core — Advanced Systems Instrumentation Suite"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Aetheris" }]
+keywords = ["forensics", "sysadmin", "windows", "instrumentation", "pyqt6"]
+
+# Minimum runtime for the GUI + core telemetry.
+dependencies = [
+    "PyQt6>=6.6",
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+# Recommended: unlocks charts, firewall COM, WMI, deeper Win32.
+recommended = [
+    "pyqtgraph>=0.13",
+    "numpy>=1.24",
+    "pywin32>=306; sys_platform == 'win32'",
+    "comtypes>=1.2; sys_platform == 'win32'",
+    "PyOpenGL>=3.1",
+    "geoip2>=4.7",
+]
+# Optional forensics engines (large native wheels; may lag new Python releases).
+forensics = [
+    "capstone>=5.0",
+    "keystone-engine>=0.9",
+    "memprocfs>=5.0; sys_platform == 'win32'",
+]
+# Everything.
+full = [
+    "aetheris-quantum-core[recommended,forensics]",
+]
+# Test tooling.
+test = ["pytest>=7.4"]
+# One-file executable build tooling.
+build-exe = ["pyinstaller>=6.0"]
+
+[project.gui-scripts]
+# Installs an `aetheris` launcher (GUI, no console window).
+aetheris = "aetheris.main:run_app"
+
+[project.scripts]
+# Console launcher (prints elevation/bootstrap messages), handy for debugging.
+aetheris-console = "run:main"
+# Headless forensic capture (reports/plugins; no GUI).
+aetheris-cli = "aetheris.cli:main"
+
+[tool.setuptools]
+py-modules = ["run"]
+
+[tool.setuptools.packages.find]
+include = ["aetheris*"]
+
+[tool.setuptools.package-data]
+aetheris = ["ui/assets/*.ico"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,20 @@
+# Aetheris Quantum Core — dependencies
+# Required for the GUI + core telemetry to run:
+PyQt6>=6.6
+psutil>=5.9
+
+# Recommended (features degrade gracefully if missing):
+pywin32>=306          ; sys_platform == "win32"   # Win32 handles, tokens, WMI
+comtypes>=1.2                                       # INetFwPolicy2 firewall COM
+pyqtgraph>=0.13                                     # hardware-accelerated telemetry charts
+PyOpenGL>=3.1                                        # OpenGL backend for pyqtgraph
+geoip2>=4.7                                          # offline IP geolocation (needs a GeoLite2 .mmdb)
+
+# Optional forensics engines (assembly studio; large native wheels):
+capstone>=5.0                                        # disassembler
+keystone-engine>=0.9                                 # assembler
+
+# Optional physical-memory virtualization (Virtual Memory Scanner upgrades to
+# physical RAM + hidden-process detection). Also needs an acquisition device:
+# the WinPMEM driver for live memory, or a raw/crash dump file.
+memprocfs>=5.0                                        # falls back to live Win32 backend if absent
