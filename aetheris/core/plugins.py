@@ -17,12 +17,12 @@ Each module exposes ``PLUGIN`` (a Plugin) or ``PLUGINS`` (a list). The
 """
 from __future__ import annotations
 
-import pkgutil
 import importlib
 import importlib.util
+import pkgutil
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 from . import logbus
 from .settings import config_dir
@@ -138,6 +138,8 @@ def _discover_user(extra_dirs=None) -> list[Plugin]:
             try:
                 spec = importlib.util.spec_from_file_location(
                     f"aetheris_userplugin_{f.stem}", f)
+                if spec is None or spec.loader is None:
+                    continue
                 mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)
                 out += _extract(mod, str(f))

@@ -4,17 +4,17 @@ Windows-only. The strip test spawns a child that holds a file open, then closes
 that handle out from under it and confirms the file becomes deletable.
 """
 import os
-import sys
-import time
 import shutil
-import tempfile
 import subprocess
+import sys
+import tempfile
+import time
 
 import pytest
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 
-from aetheris.storage import handles, unlock  # noqa: E402
+from aetheris.storage import handles, unlock
 
 
 def test_to_device_path():
@@ -45,25 +45,29 @@ def test_locking_processes_finds_self():
 def test_strip_closes_child_handle_and_unlocks_file():
     d = tempfile.mkdtemp()
     target = os.path.join(d, "locked.dat")
+    sentinel = os.path.join(d, "ready.flag")
     open(target, "w").write("payload")
-    child = subprocess.Popen(
-        [sys.executable, "-c",
-         f"f=open(r'{target}','r'); import time; time.sleep(30)"])  # keep handle open
+    # Child opens the file, then writes a sentinel to signal the handle is open,
+    # then blocks. This removes the Restart-Manager dependency: we KNOW the
+    # handle exists before stripping, so the native strip path is exercised
+    # deterministically (no timing-based skip) -- which is what CI must verify.
+    code = (f"f=open(r'{target}','r');"
+            f"open(r'{sentinel}','w').close();"
+            "import time; time.sleep(30)")
+    child = subprocess.Popen([sys.executable, "-c", code])
     try:
-        # Poll (child startup + Restart-Manager visibility varies by machine/load).
-        deadline = time.time() + 15
-        lockers: set[int] = set()
-        while time.time() < deadline:
-            lockers = {p for p, _ in handles.locking_processes(target)}
-            if child.pid in lockers:
-                break
-            time.sleep(0.3)
-        if child.pid not in lockers:
-            import pytest
-            pytest.skip("Restart Manager did not report the child locker in time")
+        deadline = time.time() + 20               # generous for cold CI startup
+        while not os.path.exists(sentinel) and time.time() < deadline:
+            if child.poll() is not None:
+                raise AssertionError(
+                    f"child exited early (rc={child.returncode}) before opening file")
+            time.sleep(0.05)
+        assert os.path.exists(sentinel), "child never signalled its open handle"
 
+        # The child now holds a real handle to `target`. Strip it.
         results = unlock.strip_handles(target)
-        assert results and all(ok for _pid, _hv, ok, _note in results)
+        assert results, "strip_handles found no open handles to close"
+        assert all(ok for _pid, _hv, ok, _note in results)
 
         # The child's handle to the file is gone.
         assert handles.find_file_handles(target, {child.pid}) == []

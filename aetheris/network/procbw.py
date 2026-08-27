@@ -15,13 +15,13 @@ without an elevated session or live traffic.
 """
 from __future__ import annotations
 
-import time
-import socket
 import ctypes
+import socket
+import time
 from ctypes import wintypes
 
-from ..core import winapi as W
 from ..core import logbus
+from ..core import winapi as W
 
 SRC = "network.procbw"
 

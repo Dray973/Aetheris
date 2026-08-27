@@ -7,15 +7,17 @@ def _make_widget():
     # without pulling in PyQt6.
     import psutil
     from PyQt6.QtCore import QTimer
-    from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
+    from PyQt6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
 
     class Gauges(QWidget):
         def __init__(self):
             super().__init__()
             v = QVBoxLayout(self)
             v.addWidget(QLabel("Live system gauges", objectName="title"))
-            self.cpu = QProgressBar(); self.cpu.setFormat("CPU  %p%")
-            self.ram = QProgressBar(); self.ram.setFormat("RAM  %p%")
+            self.cpu = QProgressBar()
+            self.cpu.setFormat("CPU  %p%")
+            self.ram = QProgressBar()
+            self.ram.setFormat("RAM  %p%")
             v.addWidget(self.cpu)
             v.addWidget(self.ram)
             self.cores_lbl = QLabel("", objectName="subtle")

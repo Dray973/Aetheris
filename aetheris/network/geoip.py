@@ -106,15 +106,18 @@ class GeoIPResolver:
         if ip in self._cache:
             return self._cache[ip]
         loc = GeoLocation()
+        reader = self._reader
         try:
+            if reader is None:
+                return loc
             if self._is_city:
-                r = self._reader.city(ip)
+                r = reader.city(ip)
                 loc = GeoLocation(
                     country=r.country.iso_code or "",
                     city=r.city.name or "",
                     lat=r.location.latitude, lon=r.location.longitude)
             else:
-                r = self._reader.country(ip)
+                r = reader.country(ip)
                 loc = GeoLocation(country=r.country.iso_code or "")
         except Exception:
             loc = GeoLocation()   # address not in DB / private / invalid

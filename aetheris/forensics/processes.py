@@ -13,14 +13,14 @@ so the process list is always populated even from a non-elevated session.
 from __future__ import annotations
 
 import ctypes
+from collections.abc import Iterator
 from ctypes import wintypes
-from dataclasses import dataclass, asdict
-from typing import Iterator
+from dataclasses import asdict, dataclass
 
 import psutil
 
-from ..core import winapi as W
 from ..core import logbus
+from ..core import winapi as W
 
 SRC = "forensics.processes"
 

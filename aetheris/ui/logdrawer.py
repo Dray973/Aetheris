@@ -9,11 +9,17 @@ from __future__ import annotations
 
 import time
 
+from PyQt6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QComboBox, QLabel,
-    QPushButton, QCheckBox,
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtGui import QTextCharFormat, QColor, QTextCursor, QFont
 
 from ..core import logbus
 from ..core.logbus import Level, LogEvent

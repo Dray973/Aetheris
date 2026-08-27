@@ -19,8 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import logbus
-from . import safety
+from . import dryrun, logbus, safety
 
 SRC = "core.registry"
 
@@ -162,7 +161,7 @@ def save_snapshot(tree: dict, path: str) -> tuple[bool, str]:
 def load_snapshot(path: str) -> dict:
     """Load a snapshot previously written by save_snapshot()."""
     import json
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -191,8 +190,8 @@ def history_dir() -> Path:
 def save_to_history(root: str, subkey: str, tree: dict, label: str = "") -> HistoryEntry:
     """Write a timestamped snapshot into the managed history store."""
     import json
-    import time
     import re
+    import time
     d = history_dir()
     d.mkdir(parents=True, exist_ok=True)
     ts = time.strftime("%Y%m%d-%H%M%S")
@@ -202,7 +201,7 @@ def save_to_history(root: str, subkey: str, tree: dict, label: str = "") -> Hist
             "keys": len(tree), "label": label}
     with open(path, "w", encoding="utf-8") as fh:
         json.dump({"meta": meta, "tree": tree}, fh, indent=2, default=str)
-    logbus.action(SRC, f"snapshot saved to history", str(path))
+    logbus.action(SRC, "snapshot saved to history", str(path))
     return HistoryEntry(str(path), ts, root, subkey, len(tree), label)
 
 
@@ -215,7 +214,7 @@ def list_history() -> list[HistoryEntry]:
     out: list[HistoryEntry] = []
     for f in sorted(d.glob("*.json"), reverse=True):
         try:
-            with open(f, "r", encoding="utf-8") as fh:
+            with open(f, encoding="utf-8") as fh:
                 meta = json.load(fh).get("meta", {})
             out.append(HistoryEntry(str(f), meta.get("timestamp", ""),
                                     meta.get("root", ""), meta.get("subkey", ""),
@@ -228,7 +227,7 @@ def list_history() -> list[HistoryEntry]:
 def load_history(path: str) -> dict:
     """Return the snapshot tree from a history entry file."""
     import json
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh).get("tree", {})
 
 
@@ -251,6 +250,8 @@ def set_value(root: str, subkey: str, name: str, data, vtype=None) -> tuple[bool
     """Set a value, recording the prior state for rollback."""
     if winreg is None:
         return False, "Windows only"
+    if dryrun.skip(SRC, f"set {root}\\{subkey}\\{name} = {data}"):
+        return True, "[dry-run] not applied"
     hive = _HIVES[root.upper()]
     vtype = vtype or winreg.REG_DWORD
     prior = _read_value(root, subkey, name)
@@ -311,11 +312,12 @@ def disable_diagtrack_service() -> tuple[bool, str]:
         ok = r.returncode == 0
         if ok:
             logbus.action(SRC, "DiagTrack service disabled")
-            safety.ledger.register(
-                "DiagTrack service",
-                lambda: subprocess.run(["sc", "config", "DiagTrack", "start=", "auto"],
-                                       capture_output=True, text=True),
-            )
+
+            def _reenable() -> None:
+                subprocess.run(["sc", "config", "DiagTrack", "start=", "auto"],
+                               capture_output=True, text=True)
+
+            safety.ledger.register("DiagTrack service", _reenable)
         return ok, (r.stdout or r.stderr).strip()
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
@@ -378,7 +380,7 @@ def add_context_command(label: str, command: str,
 class MenuItem:
     label: str
     command: str | None = None                 # leaf command (ignored if children)
-    children: list["MenuItem"] = field(default_factory=list)
+    children: list[MenuItem] = field(default_factory=list)
 
     @property
     def is_branch(self) -> bool:

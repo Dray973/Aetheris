@@ -8,19 +8,31 @@ dialogs and the audit log.
 """
 from __future__ import annotations
 
+import psutil
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QLabel, QMessageBox, QLineEdit, QPlainTextEdit, QSpinBox,
-    QInputDialog, QHeaderView, QSplitter, QTabWidget, QFileDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
-import psutil
-
-from ...forensics import processes, memory, disasm
 from ...core import logbus, report
-from ..workers import Worker
+from ...forensics import disasm, memory, processes
 from ..telemetry import TelemetryChart
+from ..workers import Worker
 from .memvirt_tab import MemVirtWidget
 
 

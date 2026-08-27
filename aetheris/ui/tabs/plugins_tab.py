@@ -7,16 +7,23 @@ headlessly via ``aetheris-cli run <name>``.
 """
 from __future__ import annotations
 
-import os
-
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QLabel,
-    QPushButton, QPlainTextEdit, QSplitter, QFileDialog, QStackedWidget,
-)
-from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPlainTextEdit,
+    QPushButton,
+    QSplitter,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ...core import plugins, logbus
+from ...core import logbus, plugins
 from ..workers import Worker
 
 

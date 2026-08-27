@@ -17,14 +17,14 @@ Safety / robustness:
 """
 from __future__ import annotations
 
-import os
 import ctypes
+import os
 import threading
 from ctypes import wintypes
 from dataclasses import dataclass
 
-from ..core import winapi as W
 from ..core import logbus
+from ..core import winapi as W
 
 SRC = "storage.handles"
 

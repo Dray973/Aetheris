@@ -34,7 +34,7 @@ design is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ```
 aetheris/
-├── core/          privileges, native bindings, log bus, Omega Rollback, registry, settings, reports
+├── core/          privileges, native bindings, log bus, hash-chained audit, dry-run, Omega Rollback, registry, settings, reports
 ├── forensics/     process autopsy, RAM matrix, Capstone/Keystone assembly studio
 ├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator
 ├── network/       socket→process interceptor, per-process B/s, GeoIP, firewall isolation
@@ -45,7 +45,7 @@ aetheris/
 run.py             entry point + UAC elevation bootstrap
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (96 tests) for the cores
+tests/             pytest suite (121 tests) for the cores
 ```
 
 ## Install & run
@@ -86,17 +86,21 @@ features and degrade gracefully when absent (the UI tells you what's missing).
 
 ```powershell
 pip install .[test]
-pytest                                 # 96 tests over the cores
+pytest                                 # 121 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
-intent routing, MFT run-list/fixup parsing + tree aggregation, treemap squarify
-layout, registry diffing, dedupe, the memory hex formatter, per-process
-bandwidth attribution math, GeoIP field extraction (plus a real GeoLite2 lookup
-when a DB is present), the cascading-menu spec parser, the settings store and
-report serializers, the committed app-icon structure, and (Windows-only) the ETW
-sampler contract, the Restart-Manager lockers, and the live handle-strip
-round-trip. GitHub Actions (`.github/workflows/ci.yml`) runs
+intent routing, MFT run-list/fixup parsing + fragmented-$MFT walk + tree
+aggregation (plus a **hypothesis fuzz** of the binary parser against malformed
+run-lists/records), the **Qt-free** treemap squarify layout (imports and runs
+with no PyQt6 installed), registry diffing, dedupe, the memory hex formatter,
+per-process bandwidth attribution math, GeoIP field extraction (plus a real
+GeoLite2 lookup when a DB is present), the cascading-menu spec parser, the
+settings store and report serializers, the **tamper-evident hash-chained audit
+log**, **global dry-run** enforcement (a real op that must not mutate), the
+**Omega-Rollback PANIC round-trip**, the committed app-icon structure, and
+(Windows-only) the ETW sampler contract, the Restart-Manager lockers, and the
+live handle-strip round-trip. GitHub Actions (`.github/workflows/ci.yml`) runs
 it on Windows against Python 3.11 and 3.12 on every push/PR; a tag push runs
 `release.yml`, which builds `AetherisQuantumCore.exe`, **headlessly smoke-launches
 it**, compiles `AetherisSetup.exe`, and attaches both to a GitHub Release.
@@ -114,17 +118,27 @@ This suite is built to be **auditable and reversible**, not stealthy:
 - **Omega Rollback.** Reversible operations (firewall rules, registry writes,
   service changes, context-menu edits) register an undo with a session ledger.
   The **PANIC** button (toolbar, or `Ctrl+Shift+Esc`) reverts them in reverse
-  order. `core/safety.py` also creates a System Restore point and can snapshot a
-  registry key to a hive file before deep changes.
+  (LIFO) order, isolating any failing undo so the rest still run — a property the
+  test suite proves end-to-end for a real registry op. `core/safety.py` also
+  creates a System Restore point and can snapshot a registry key to a hive file
+  before deep changes.
+- **Dry-run mode.** A global **🧪 Dry-run** toggle (toolbar) makes every opted-in
+  destructive op — firewall isolation, registry writes, autorun disables, file
+  obliteration — log exactly what it *would* do to the audit console and return
+  without touching the system or registering an undo, so you can rehearse a
+  sequence before arming it (`core/dryrun.py`).
 - **Confirmation gates.** Memory patching, process termination, file
   obliteration, and every generated automation script require an explicit modal
   confirmation before executing.
 - **Guardrails in code.** The file obliterator refuses paths inside protected OS
   roots and refuses to close handles held by / terminate system-critical
   processes — enforced in `storage/unlock.py`, not just the UI.
-- **Audit console.** Every native transaction, allocation address, handle op,
-  and destructive action streams to the bottom drawer with return codes and a
-  human-readable translation.
+- **Tamper-evident audit console.** Every native transaction, allocation
+  address, handle op, and destructive action streams to the bottom drawer with
+  return codes and a human-readable translation — and each event is linked into
+  a **SHA-256 hash chain** (`core/audit.py`), so any later edit, deletion, or
+  reorder of the trail is detectable. The toolbar **🛡 Audit** button re-verifies
+  the chain on demand.
 
 The suite does **not** include a credential-extraction path against
 `HKLM\SAM` / `HKLM\SECURITY`; the registry tools operate on ordinary hives.
@@ -217,9 +231,9 @@ attaches everything to the GitHub Release automatically.
 
 | Module | Shipped & functional | Environment-gated / optional |
 |---|---|---|
-| ① Memory/Process | psutil autopsy, mitigation query, working-set trim, standby purge, file-cache flush, Capstone disasm of live memory, Keystone patch, **Virtual Memory Scanner** (backend-driven: live `VirtualQueryEx` region maps + `ReadProcessMemory` hex view now; **MemProcFS** physical-RAM virtualization, hidden-process & physical reads when the lib + acquisition driver are present), **live CPU/RAM telemetry chart (pyqtgraph)** | — |
+| ① Memory/Process | psutil autopsy, mitigation query, working-set trim, standby purge, file-cache flush, Capstone disasm of live memory, Keystone patch, **Virtual Memory Scanner** (live `VirtualQueryEx` region maps + `ReadProcessMemory` hex view), **live CPU/RAM telemetry chart (pyqtgraph)** | **MemProcFS** physical-RAM virtualization / hidden-process & physical reads — needs the `memprocfs` lib **and** an acquisition driver; not exercised by CI |
 | ② Storage/MFT | NTFS binary parse w/ **full $MFT run-list walk** (fragmented MFTs), fixups, **directory-tree reconstruction + squarified tree-map canvas** (drill-down), SHA-256 dedupe, ghost scan, guarded obliterator, **Restart-Manager lockers + raw handle stripping** (`NtQuerySystemInformation` handle table → `DuplicateHandle(DUPLICATE_CLOSE_SOURCE)`, timeout-guarded name queries) | — |
-| ③ Network | socket→process map, system bandwidth, **live throughput chart (pyqtgraph)**, INetFwPolicy2 isolate/deisolate w/ rollback, **live per-process TCP B/s via ETW** (native `Microsoft-Windows-Kernel-Network` consumer — verified attributing bytes to the owning PID; IP-Helper EStats kept as a fallback), **offline IP geolocation** (geoip2 + GeoLite2 `.mmdb`; verified end-to-end against a real DB — `81.2.69.160 → GB · London`; one-command enable via `docs/fetch_geoip.py`) | — |
+| ③ Network | socket→process map, system bandwidth, **live throughput chart (pyqtgraph)**, INetFwPolicy2 isolate/deisolate w/ rollback, **offline IP geolocation** (geoip2 + GeoLite2 `.mmdb`; field extraction is unit-tested, and an opt-in test performs a real-DB lookup — `81.2.69.160 → GB · London` — when a GeoLite2 DB is present; one-command enable via `docs/fetch_geoip.py`) | **live per-process TCP B/s via ETW** — native `Microsoft-Windows-Kernel-Network` consumer that starts a live kernel session when elevated. CI verifies the sampler's lifecycle, its graceful degradation without elevation, and the x64 struct ABI; per-process byte **attribution** requires elevation **and** real (non-loopback) NIC traffic, so it is *not* asserted by CI. IP-Helper EStats kept as a fallback |
 | ④ Shell/Registry | Regshot-style snapshot diff (Markdown/structured/history), reversible privacy toggles, DiagTrack disable, context-menu editor, **multi-level cascading submenu builder**, **Autoruns manager** (Run/RunOnce + Startup folders; reversible enable/disable) | — |
 | ⑤ Auto-Shell | deterministic NL→PowerShell: find/move, kill-by-memory, kill-by-name, CPU affinity, flush DNS, empty recycle bin, clear temp, restart service, largest-files — all behind a confirm gate + a refusal guard for "kill all processes"-style inputs | still deterministic (no LLM) by design |
 

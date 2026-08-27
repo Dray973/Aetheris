@@ -7,11 +7,19 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QComboBox,
-    QPushButton, QFileDialog, QPlainTextEdit,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
 )
 
-from ..core import scheduler, logbus
+from ..core import logbus, scheduler
 from .theme import QSS
 
 

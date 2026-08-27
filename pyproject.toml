@@ -39,7 +39,7 @@ full = [
     "aetheris-quantum-core[recommended,forensics]",
 ]
 # Test tooling.
-test = ["pytest>=7.4"]
+test = ["pytest>=7.4", "hypothesis>=6.0"]
 # One-file executable build tooling.
 build-exe = ["pyinstaller>=6.0"]
 
@@ -65,3 +65,48 @@ aetheris = ["ui/assets/*.ico"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 110          # PyQt6 flag/enum calls are legitimately verbose
+target-version = "py310"
+
+[tool.ruff.lint]
+# Enforced rule set: pyflakes (F), import order (I), pycodestyle (E),
+# pyupgrade (UP), and bugbear (B) -- the families that catch real defects and
+# modernization. The opinionated style/security families (SIM/RUF/S/BLE/PLW)
+# are intentionally left out: this suite makes many native calls (ctypes, COM,
+# winreg) guarded by broad `except`/`pass` on purpose, and its UI strings use
+# em-dashes and box-drawing glyphs -- both of which those rules flag as noise.
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E402",  # a few imports sit after a skip-guard / sys.path setup on purpose
+    "E741",  # single-letter names (l, i) read fine in tight numeric/loop code
+    "B006",  # default-arg value intentionally snapshots state for a closure
+    "B007",  # a loop var is sometimes kept for readability even when unused
+    "B027",  # `close()` is an optional lifecycle hook, not every backend needs it
+]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The PyQt6 UI layer is not statically checked: PyQt6's type stubs emit false
+# overload / signal-typing errors (QLabel(objectName=...), QByteArray, nullable
+# QTableWidgetItem) that don't reflect real bugs.
+module = ["aetheris.ui.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# These modules bind Windows DLL handles dynamically via ctypes at runtime
+# (attributes attached to WinDLL objects; `WinDLL | None` across the IS_WINDOWS
+# guard), which static analysis can't model. They are covered by the Windows
+# test suite instead.
+module = ["aetheris.core.winapi", "aetheris.network.procbw", "aetheris.network.etwbw"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# mypy can't infer the type of a default-argument lambda used to capture a
+# closure variable (the deliberate rollback-undo idiom in these modules).
+module = ["aetheris.core.autoruns", "aetheris.network.firewall"]
+disable_error_code = ["misc"]

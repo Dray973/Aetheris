@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 import psutil
 
-from ..core import logbus
+from ..core import dryrun, logbus
 from . import handles
 
 SRC = "storage.unlock"
@@ -144,6 +144,8 @@ def obliterate(path: str, confirm: bool, take_own: bool = False,
         return False, "refused: path is inside a protected OS root"
     if not os.path.exists(path):
         return False, "path does not exist"
+    if dryrun.skip(SRC, f"obliterate {path}"):
+        return True, f"[dry-run] would delete {path}"
 
     release_lockers(path, terminate=False)  # report, don't kill implicitly
     if strip_handles_first:

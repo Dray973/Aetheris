@@ -19,11 +19,11 @@ privileges" makes the tool auditable and avoids a hidden-daemon design.
 """
 from __future__ import annotations
 
+import ctypes
 import os
 import sys
-import ctypes
+from collections.abc import Iterable
 from ctypes import wintypes
-from typing import Iterable
 
 from . import winapi as W
 

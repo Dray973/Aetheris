@@ -7,7 +7,8 @@ exception) back on the GUI thread via signals, so long-running native calls
 """
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from PyQt6.QtCore import QThread, pyqtSignal
 

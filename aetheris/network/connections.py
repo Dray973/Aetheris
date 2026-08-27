@@ -17,14 +17,12 @@ Notes:
 """
 from __future__ import annotations
 
-import socket
 import ipaddress
+import socket
 import time
 from dataclasses import dataclass
 
 import psutil
-
-from ..core import logbus
 
 SRC = "network.connections"
 

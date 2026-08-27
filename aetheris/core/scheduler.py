@@ -7,8 +7,8 @@ require elevation. Uses the CLI module so the same code path as the terminal.
 """
 from __future__ import annotations
 
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 from . import logbus

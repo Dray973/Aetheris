@@ -29,7 +29,7 @@ def test_regdiff_rows_are_categorized_and_sorted():
     rows = registry.diff_trees(before, after).rows()
     kinds = {r[0] for r in rows}
     assert kinds == {"Added", "Modified", "Removed"}
-    modified = [r for r in rows if r[0] == "Modified"][0]
+    modified = next(r for r in rows if r[0] == "Modified")
     assert "a" in modified[1] and modified[2] and modified[3]  # key, before, after
 
 

@@ -13,12 +13,13 @@ string transform (no I/O, no Qt), which keeps it unit-testable.
 """
 from __future__ import annotations
 
-import io
 import csv
+import io
 import json
-import time
 import platform
-from typing import Any, Iterable, Sequence
+import time
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 APP = "Aetheris Quantum Core"
 

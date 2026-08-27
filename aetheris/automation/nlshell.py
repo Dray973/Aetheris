@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from ..core import logbus
 
@@ -238,7 +238,7 @@ def _largest_files(text: str) -> CompiledCommand | None:
         drv = re.search(r"\bdrive\s+([a-zA-Z])\b|\b([a-zA-Z]):", text, re.IGNORECASE)
         path = (f"{(drv.group(1) or drv.group(2)).upper()}:\\" if drv else "C:\\")
     nm = re.search(r"\btop\s+(\d{1,3})\b|\b(\d{1,3})\s+(?:largest|biggest)\b", text, re.IGNORECASE)
-    n = int((nm.group(1) or nm.group(2))) if nm else 20
+    n = int(nm.group(1) or nm.group(2)) if nm else 20
     script = (
         f"Get-ChildItem -Path \"{path}\" -Recurse -File -ErrorAction SilentlyContinue | "
         f"Sort-Object Length -Descending | Select-Object -First {n} "
@@ -251,7 +251,7 @@ def _largest_files(text: str) -> CompiledCommand | None:
     )
 
 
-_HANDLERS: tuple[Callable[[str], "CompiledCommand | None"], ...] = (
+_HANDLERS: tuple[Callable[[str], CompiledCommand | None], ...] = (
     _find_and_move,
     _kill_by_memory,
     _kill_by_name,

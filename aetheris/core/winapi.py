@@ -8,8 +8,8 @@ handles simply become ``None``) so the codebase remains testable anywhere.
 """
 from __future__ import annotations
 
-import sys
 import ctypes
+import sys
 from ctypes import wintypes
 
 IS_WINDOWS = sys.platform == "win32"

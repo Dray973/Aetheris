@@ -7,11 +7,17 @@ user explicitly clicks Execute.
 """
 from __future__ import annotations
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QPlainTextEdit, QMessageBox,
-)
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...automation import nlshell
 from ...core import logbus

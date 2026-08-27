@@ -15,8 +15,8 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 
-from ..core import winapi as W
 from ..core import logbus
+from ..core import winapi as W
 
 SRC = "forensics.disasm"
 

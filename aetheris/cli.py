@@ -17,12 +17,12 @@ it's suitable for cron / Task Scheduler.
 """
 from __future__ import annotations
 
+import argparse
 import sys
 import time
-import argparse
 from pathlib import Path
 
-from .core import report, plugins
+from .core import plugins, report
 
 
 def _gen(cmd: str, fmt: str) -> tuple[str, str]:
@@ -54,22 +54,32 @@ def _gen(cmd: str, fmt: str) -> tuple[str, str]:
     raise ValueError(f"unknown command {cmd!r}")
 
 
-def _timestamped(path: str) -> str:
+def _timestamped(path: str, index: int = 0, count: int = 1) -> str:
+    """Unique output name for capture `index` (0-based) of a `count`-long run.
+
+    The capture index makes each name distinct *without* relying on the previous
+    file already being on disk, so rapid same-second captures never collide (and
+    it works for zero-length or not-yet-flushed writes too). A trailing
+    existence check is kept only as a backstop for collisions across separate
+    runs that happen to land in the same second.
+    """
     p = Path(path)
-    base = f"{p.stem}-{time.strftime('%Y%m%d-%H%M%S')}"
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    seq = f"-{index + 1:0{len(str(max(count, 1)))}d}" if count > 1 else ""
+    base = f"{p.stem}-{stamp}{seq}"
     cand = p.with_name(f"{base}{p.suffix}")
     i = 1
-    while cand.exists():                      # avoid collisions on rapid captures
+    while cand.exists():                      # cross-run backstop
         cand = p.with_name(f"{base}-{i}{p.suffix}")
         i += 1
     return str(cand)
 
 
-def _emit(content: str, out: str | None, stamp: bool) -> None:
+def _emit(content: str, out: str | None, index: int = 0, count: int = 1) -> None:
     if not out:
         sys.stdout.write(content + ("\n" if not content.endswith("\n") else ""))
         return
-    path = _timestamped(out) if stamp else out
+    path = _timestamped(out, index, count) if count > 1 else out
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as fh:
         fh.write(content)
@@ -103,20 +113,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{p.name:<22} {p.description}{src}")
         return 0
 
-    def one_capture() -> None:
+    count = max(args.count, 1)
+
+    def one_capture(index: int) -> None:
         if args.command == "run":
             ok, content = plugins.run_plugin(args.plugin)
             if not ok:
                 print(content, file=sys.stderr)
                 return
-            _emit(content, args.out, stamp=args.count > 1)
+            _emit(content, args.out, index, count)
         else:
             content, _ext = _gen(args.command, args.format)
-            _emit(content, args.out, stamp=args.count > 1)
+            _emit(content, args.out, index, count)
 
-    count = max(args.count, 1)
     for i in range(count):
-        one_capture()
+        one_capture(i)
         if i < count - 1 and args.interval > 0:
             time.sleep(args.interval)
     return 0

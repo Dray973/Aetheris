@@ -9,31 +9,40 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QByteArray
-from PyQt6.QtGui import QKeySequence, QShortcut, QAction, QIcon
+from PyQt6.QtCore import QByteArray, Qt
+from PyQt6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QMainWindow, QTabWidget, QDockWidget, QToolBar, QLabel, QMessageBox,
-    QWidget, QPlainTextEdit, QVBoxLayout, QFileDialog,
+    QDockWidget,
+    QFileDialog,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPlainTextEdit,
+    QTabWidget,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
 )
 
 ICON_PATH = Path(__file__).resolve().parent / "assets" / "aetheris.ico"
 
 from .. import __version__
-from ..core import safety, logbus, privileges, report
+from ..core import audit, dryrun, logbus, privileges, report, safety
 from ..core.settings import settings
 from .logdrawer import LogDrawer
-from .theme import QSS
-from .tabs.memory_tab import MemoryTab
-from .tabs.storage_tab import StorageTab
-from .tabs.network_tab import NetworkTab
-from .tabs.shell_tab import ShellTab
 from .tabs.autoshell_tab import AutoShellTab
+from .tabs.memory_tab import MemoryTab
+from .tabs.network_tab import NetworkTab
 from .tabs.plugins_tab import PluginsTab
+from .tabs.shell_tab import ShellTab
+from .tabs.storage_tab import StorageTab
+from .theme import QSS
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
+        audit.wire_to_logbus()   # hash-chain every audit event from here on
         self.setWindowTitle("Aetheris Quantum Core — Advanced Systems Instrumentation Suite")
         self.resize(1400, 900)
         if ICON_PATH.exists():
@@ -108,6 +117,17 @@ class MainWindow(QMainWindow):
         updates_action.triggered.connect(self.check_for_updates)
         tb.addAction(updates_action)
 
+        audit_action = QAction("🛡  Audit", self)
+        audit_action.triggered.connect(self.verify_audit_log)
+        tb.addAction(audit_action)
+
+        dryrun_action = QAction("🧪  Dry-run", self)
+        dryrun_action.setCheckable(True)
+        dryrun_action.setToolTip("Rehearse destructive actions: log what they "
+                                 "would do without touching the system")
+        dryrun_action.toggled.connect(self.toggle_dry_run)
+        tb.addAction(dryrun_action)
+
         panic_action = QAction("⛔  PANIC / UNDO", self)
         panic_action.triggered.connect(self.trigger_panic)
         tb.addAction(panic_action)
@@ -119,6 +139,29 @@ class MainWindow(QMainWindow):
     def open_schedule_dialog(self) -> None:
         from .schedule_dialog import ScheduleDialog
         ScheduleDialog(self).exec()
+
+    def toggle_dry_run(self, on: bool) -> None:
+        dryrun.set_enabled(on)
+        self.env_lbl.setText("  Aetheris Quantum Core — DRY-RUN   " if on
+                             else "  Aetheris Quantum Core   ")
+
+    def verify_audit_log(self) -> None:
+        """Re-hash the session's audit chain and report whether it's intact."""
+        log = audit.audit
+        ok, bad = log.verify()
+        n = len(log)
+        if ok:
+            logbus.success("ui.main", f"audit log verified: {n} record(s), chain intact")
+            QMessageBox.information(
+                self, "Audit log integrity",
+                f"Tamper-evident audit log intact.\n\n{n} record(s); "
+                "SHA-256 hash chain verified end to end.")
+        else:
+            logbus.error("ui.main", f"audit log INTEGRITY FAILURE at record {bad}")
+            QMessageBox.critical(
+                self, "Audit log integrity",
+                f"Audit chain BROKEN at record {bad} of {n}.\n\n"
+                "The recorded trail has been altered since it was written.")
 
     # -- auto-update --------------------------------------------------------
     def _auto_check_updates(self) -> None:

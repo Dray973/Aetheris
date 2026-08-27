@@ -1,4 +1,5 @@
 """NTFS MFT parsing primitives: run-list decode, fixups, tree aggregation."""
+import io
 import struct
 
 from aetheris.storage import mft
@@ -40,6 +41,45 @@ def test_apply_fixups_success_restores_sector_tails():
 def test_apply_fixups_detects_torn_write():
     rec = _make_record(tail2=b"\x99\x99")   # sector-2 tail != USN
     assert mft._apply_fixups(rec, 512) is False
+
+
+def _synthetic_mft_record0(bps=512, record_size=1024):
+    """Build a valid $MFT record 0 whose non-resident $DATA attribute carries a
+    *fragmented* (two-extent) run-list, so _mft_extents must decode fixups, walk
+    the attributes, and follow the mapping pairs -- the headline "fragmented MFT
+    walk" end to end (no raw disk needed)."""
+    rec = bytearray(record_size)
+    rec[0:4] = b"FILE"
+    struct.pack_into("<H", rec, 0x04, 0x30)      # USA offset
+    struct.pack_into("<H", rec, 0x06, 3)         # USA count: 1 USN + 2 fixups
+    struct.pack_into("<H", rec, 0x14, 0x38)      # first attribute offset (56)
+    usn = b"\x2a\x00"
+    rec[0x30:0x32] = usn                         # USN
+    rec[0x32:0x34] = b"\xde\xad"                 # saved sector-1 tail
+    rec[0x34:0x36] = b"\xbe\xef"                 # saved sector-2 tail
+    rec[bps - 2:bps] = usn                       # sector tails must equal USN
+    rec[2 * bps - 2:2 * bps] = usn
+
+    off = 0x38
+    struct.pack_into("<I", rec, off + 0x00, mft.ATTR_DATA)   # type 0x80
+    struct.pack_into("<I", rec, off + 0x04, 0x48)            # attribute length
+    rec[off + 0x08] = 1                                      # non-resident
+    struct.pack_into("<H", rec, off + 0x20, 0x40)            # mapping-pairs offset
+    # fragmented run-list at off+0x40: run(4 clu @lcn2) + run(2 clu @lcn5) + end
+    runs = bytes([0x11, 0x04, 0x02, 0x11, 0x02, 0x03, 0x00])
+    rec[off + 0x40:off + 0x40 + len(runs)] = runs
+    struct.pack_into("<I", rec, off + 0x48, mft.ATTR_END)    # attribute terminator
+    return bytes(rec)
+
+
+def test_mft_extents_follows_fragmented_data_run():
+    boot = mft.BootInfo(bytes_per_sector=512, sectors_per_cluster=8,
+                        cluster_size=4096, mft_cluster=0, record_size=1024)
+    fh = io.BytesIO(_synthetic_mft_record0())
+    extents = mft._mft_extents(fh, boot)
+    # Two physical extents => the $MFT itself is fragmented and fully walked.
+    assert extents == [(2 * 4096, 4 * 4096), (5 * 4096, 2 * 4096)]
+    assert len(extents) == 2
 
 
 def test_build_tree_aggregates_sizes():

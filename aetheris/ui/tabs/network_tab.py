@@ -10,15 +10,24 @@ from __future__ import annotations
 import psutil
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QLabel, QCheckBox, QMessageBox, QHeaderView, QFileDialog,
+    QCheckBox,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
-from ...network import connections, firewall
 from ...core import logbus, report
 from ...core.settings import settings
-from ..workers import Worker
+from ...network import connections, firewall
 from ..telemetry import TelemetryChart
+from ..workers import Worker
 
 
 def _fmt_bps(v: float) -> str:

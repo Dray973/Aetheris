@@ -1,5 +1,5 @@
 """Built-in plugin: processes listening on TCP/UDP ports."""
-from aetheris.core.plugins import plugin, PluginContext
+from aetheris.core.plugins import PluginContext, plugin
 
 
 @plugin("listening-ports", "List sockets in the LISTEN state and their owners")

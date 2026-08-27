@@ -19,7 +19,8 @@ def run_app() -> int:
         return 2
 
     from PyQt6.QtGui import QIcon
-    from .ui.mainwindow import MainWindow, ICON_PATH
+
+    from .ui.mainwindow import ICON_PATH, MainWindow
 
     app = QApplication(sys.argv)
     app.setApplicationName("Aetheris Quantum Core")

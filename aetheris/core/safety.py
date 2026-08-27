@@ -15,17 +15,17 @@ Nothing here executes a destructive change on its own — modules call
 """
 from __future__ import annotations
 
-import os
-import time
 import ctypes
+import os
 import subprocess
 import threading
+import time
+from collections.abc import Callable
 from ctypes import wintypes
 from dataclasses import dataclass
-from typing import Callable
 
-from . import winapi as W
 from . import logbus
+from . import winapi as W
 
 SRC = "core.safety"
 

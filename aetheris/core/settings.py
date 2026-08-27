@@ -9,8 +9,8 @@ back to a built-in default, so a missing or corrupt file is harmless.
 """
 from __future__ import annotations
 
-import os
 import json
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -51,7 +51,7 @@ class Settings:
 
     def load(self) -> None:
         try:
-            with open(self.path, "r", encoding="utf-8") as fh:
+            with open(self.path, encoding="utf-8") as fh:
                 data = json.load(fh)
             if isinstance(data, dict):
                 with self._lock:

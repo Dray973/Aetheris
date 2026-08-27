@@ -19,19 +19,18 @@ manifest + a local file (no server needed).
 """
 from __future__ import annotations
 
-import os
-import re
-import sys
-import json
 import hashlib
+import json
+import re
 import subprocess
+import sys
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
 from .. import __version__ as CURRENT_VERSION
 from . import logbus
-from .settings import settings, config_dir, DEFAULTS
+from .settings import DEFAULTS, config_dir, settings
 
 
 def effective_update_url() -> str:

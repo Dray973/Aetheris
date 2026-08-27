@@ -9,15 +9,25 @@ is active, a physical-address hex reader is exposed too.
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QTableWidget, QTableWidgetItem,
-    QPushButton, QLabel, QLineEdit, QSpinBox, QPlainTextEdit, QHeaderView,
-    QCheckBox,
-)
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ...forensics import memvirt
 from ...core import logbus
+from ...forensics import memvirt
 from ..workers import Worker
 
 

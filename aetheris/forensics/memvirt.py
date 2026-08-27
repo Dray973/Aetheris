@@ -22,10 +22,10 @@ from __future__ import annotations
 import ctypes
 from abc import ABC, abstractmethod
 from ctypes import wintypes
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from ..core import winapi as W
 from ..core import logbus
+from ..core import winapi as W
 
 SRC = "forensics.memvirt"
 
@@ -209,7 +209,7 @@ class MemProcFSBackend(MemoryBackend):
         self._vmm = vmm
 
     @classmethod
-    def try_create(cls, device: str | None = None) -> "MemProcFSBackend | None":
+    def try_create(cls, device: str | None = None) -> MemProcFSBackend | None:
         """
         Attempt to initialize MemProcFS. ``device`` is a raw/crash dump path, or
         a live-acquisition device such as 'pmem' (WinPMEM) / 'fpga'. Returns None

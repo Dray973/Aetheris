@@ -1,5 +1,5 @@
 """Built-in plugin: active connections to public IP addresses."""
-from aetheris.core.plugins import plugin, PluginContext
+from aetheris.core.plugins import PluginContext, plugin
 
 
 @plugin("public-connections", "List established connections to public IPs (with geo)")

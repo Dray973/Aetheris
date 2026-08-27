@@ -10,18 +10,29 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QTableWidget, QTableWidgetItem,
-    QPushButton, QLabel, QLineEdit, QSpinBox, QFileDialog, QMessageBox,
-    QPlainTextEdit, QCheckBox, QHeaderView,
+    QCheckBox,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
-from ...storage import mft, dedupe, unlock
 from ...core import logbus
 from ...core.settings import settings
-from ..workers import Worker
+from ...storage import dedupe, mft, unlock
 from ..treemap import TreemapWidget
+from ..workers import Worker
 
 
 def _human(n: int) -> str:

@@ -1,5 +1,5 @@
 """Persistent settings store — defaults, round-trip, resilience."""
-from aetheris.core.settings import Settings, DEFAULTS
+from aetheris.core.settings import DEFAULTS, Settings
 
 
 def test_defaults_returned_for_unset(tmp_path):

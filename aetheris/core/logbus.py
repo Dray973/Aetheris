@@ -11,11 +11,11 @@ to stdout so the same ``log(...)`` calls keep working everywhere.
 """
 from __future__ import annotations
 
-import time
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 
 class Level(str, Enum):
@@ -40,9 +40,10 @@ try:
     from PyQt6.QtCore import QObject, pyqtSignal
 
     class _QtEmitter(QObject):
-        event = pyqtSignal(object)  # emits LogEvent
+        # 'event' signal deliberately shadows QObject.event (we only ever emit).
+        event = pyqtSignal(object)  # type: ignore[assignment]
 
-    _emitter: "_QtEmitter | None" = _QtEmitter()
+    _emitter: _QtEmitter | None = _QtEmitter()
     _HAS_QT = True
 except Exception:  # pragma: no cover - headless fallback
     _emitter = None

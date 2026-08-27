@@ -11,9 +11,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QFont
+from PyQt6.QtCore import QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
+
+from .treemap_layout import squarify  # pure geometry, Qt-free (see module)
 
 _PALETTE = ["#2b4a6f", "#356083", "#3f7690", "#4a8c9d", "#5aa0a0",
             "#6f9f7a", "#8a9f5f", "#a89a4e", "#b98a52", "#b5705e"]
@@ -27,60 +29,6 @@ def _human(n: int) -> str:
             return f"{f:,.1f} {unit}"
         f /= 1024
     return f"{f} B"
-
-
-def _worst(areas: list[float], side: float) -> float:
-    if not areas or side <= 0:
-        return float("inf")
-    s = sum(areas)
-    if s <= 0:
-        return float("inf")
-    mx, mn = max(areas), min(areas)
-    return max((side * side * mx) / (s * s), (s * s) / (side * side * mn))
-
-
-def squarify(items, x, y, w, h):
-    """
-    items: list of (node, value). Returns [(node, (rx, ry, rw, rh)), …].
-    Areas are scaled so the values fill the x,y,w,h rectangle.
-    """
-    items = sorted(items, key=lambda t: t[1], reverse=True)
-    total = sum(max(v, 0) for _n, v in items) or 1.0
-    scale = (w * h) / total
-    scaled = [(n, max(v, 0) * scale) for n, v in items]
-
-    out = []
-    i = 0
-    while i < len(scaled) and w > 0.5 and h > 0.5:
-        side = min(w, h)
-        row = [scaled[i]]
-        i += 1
-        while i < len(scaled):
-            cur = [a for _n, a in row]
-            if _worst(cur + [scaled[i][1]], side) > _worst(cur, side):
-                break
-            row.append(scaled[i])
-            i += 1
-        row_area = sum(a for _n, a in row)
-        if w <= h:                                  # lay a horizontal strip
-            rh = row_area / w if w else 0
-            rx = x
-            for n, a in row:
-                rw = (a / rh) if rh else 0
-                out.append((n, (rx, y, rw, rh)))
-                rx += rw
-            y += rh
-            h -= rh
-        else:                                       # lay a vertical strip
-            rw = row_area / h if h else 0
-            ry = y
-            for n, a in row:
-                rh2 = (a / rw) if rw else 0
-                out.append((n, (x, ry, rw, rh2)))
-                ry += rh2
-            x += rw
-            w -= rw
-    return out
 
 
 @dataclass

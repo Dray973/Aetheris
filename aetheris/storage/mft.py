@@ -22,8 +22,8 @@ Requires an elevated token (raw volume handles need admin).
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator
 
 from ..core import logbus
 
@@ -76,16 +76,22 @@ def read_boot_info(volume: str = r"\\.\C:") -> BootInfo:
 
 
 def _apply_fixups(record: bytearray, bps: int) -> bool:
-    """Apply the NTFS update-sequence array. Returns False on integrity fail."""
-    if record[0:4] != FILE_SIGNATURE:
+    """Apply the NTFS update-sequence array. Returns False on integrity fail
+    (or on a truncated/malformed record -- the input is attacker-controllable)."""
+    n = len(record)
+    if n < 8 or record[0:4] != FILE_SIGNATURE:
         return False
     usa_off = struct.unpack_from("<H", record, 0x04)[0]
     usa_cnt = struct.unpack_from("<H", record, 0x06)[0]
     if usa_cnt == 0:
         return True
+    if usa_off + usa_cnt * 2 > n:      # USA must fit inside the record
+        return False
     usn = record[usa_off:usa_off + 2]
     for i in range(1, usa_cnt):
         sector_end = i * bps - 2
+        if sector_end < 0 or sector_end + 2 > n:   # sector tail out of bounds
+            return False
         fix = record[usa_off + i * 2: usa_off + i * 2 + 2]
         if record[sector_end:sector_end + 2] != usn:
             return False  # torn write / corrupt record
@@ -94,7 +100,11 @@ def _apply_fixups(record: bytearray, bps: int) -> bool:
 
 
 def _parse_record(record: bytes, index: int) -> MftRecord | None:
-    if record[0:4] != FILE_SIGNATURE:
+    # Every field read below is bounds-checked: a corrupt or truncated record
+    # (attacker-controllable on-disk bytes) must yield None or a best-effort
+    # record, never an exception.
+    n = len(record)
+    if n < 0x18 or record[0:4] != FILE_SIGNATURE:
         return None
     flags = struct.unpack_from("<H", record, 0x16)[0]
     in_use = bool(flags & 0x01)
@@ -106,37 +116,33 @@ def _parse_record(record: bytes, index: int) -> MftRecord | None:
     parent_index = 0
 
     off = attr_off
-    n = len(record)
-    while off + 4 <= n:
+    while off + 8 <= n:                       # need 8 bytes for type + length
         attr_type = struct.unpack_from("<I", record, off)[0]
         if attr_type == ATTR_END:
             break
         attr_len = struct.unpack_from("<I", record, off + 4)[0]
-        if attr_len == 0 or off + attr_len > n:
+        if attr_len < 16 or off + attr_len > n:   # min header is 16 bytes
             break
         non_resident = record[off + 8]
 
-        if attr_type == ATTR_FILE_NAME and non_resident == 0:
+        if attr_type == ATTR_FILE_NAME and non_resident == 0 and off + 0x16 <= n:
             content_off = struct.unpack_from("<H", record, off + 0x14)[0]
             base = off + content_off
-            parent_ref = struct.unpack_from("<Q", record, base)[0]
-            parent_index = parent_ref & 0x0000FFFFFFFFFFFF
-            name_len = record[base + 0x40]
-            namespace = record[base + 0x41]
-            try:
+            if base + 0x42 <= n:              # parent ref .. name-length .. name
+                parent_ref = struct.unpack_from("<Q", record, base)[0]
+                parent_index = parent_ref & 0x0000FFFFFFFFFFFF
+                name_len = record[base + 0x40]
+                namespace = record[base + 0x41]
                 cand = record[base + 0x42: base + 0x42 + name_len * 2].decode(
-                    "utf-16-le", errors="replace"
-                )
-            except Exception:
-                cand = ""
-            # Prefer Win32 namespace names (1/3) over DOS 8.3 (2).
-            if namespace != 2 or not name:
-                name = cand
+                    "utf-16-le", errors="replace")   # slice self-clamps to n
+                # Prefer Win32 namespace names (1/3) over DOS 8.3 (2).
+                if namespace != 2 or not name:
+                    name = cand
 
         elif attr_type == ATTR_DATA:
-            if non_resident == 0:
+            if non_resident == 0 and off + 0x14 <= n:
                 size = struct.unpack_from("<I", record, off + 0x10)[0]
-            else:
+            elif non_resident == 1 and off + 0x38 <= n:
                 # real size lives at +0x30 in the non-resident header
                 size = struct.unpack_from("<Q", record, off + 0x30)[0]
 
@@ -145,7 +151,7 @@ def _parse_record(record: bytes, index: int) -> MftRecord | None:
     return MftRecord(index, in_use, is_dir, name, size, parent_index)
 
 
-def _parse_run_list(buf: bytes, pos: int, cluster_size: int) -> list[tuple[int, int]]:
+def _parse_run_list(buf: bytes | bytearray, pos: int, cluster_size: int) -> list[tuple[int, int]]:
     """
     Decode an NTFS mapping-pairs (data-run) list into physical extents.
     Returns [(byte_offset, byte_length), …]. Sparse runs (offset field absent)
@@ -271,7 +277,7 @@ class TreeNode:
     name: str
     is_dir: bool
     own_size: int
-    children: list["TreeNode"] = field(default_factory=list)
+    children: list[TreeNode] = field(default_factory=list)
     total_size: int = 0
 
     @property

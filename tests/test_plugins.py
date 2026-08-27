@@ -1,6 +1,6 @@
 """Plugin discovery + execution API."""
 from aetheris.core import plugins
-from aetheris.core.plugins import plugin, Plugin, PluginContext
+from aetheris.core.plugins import Plugin, PluginContext, plugin
 
 
 def test_builtin_plugins_discovered():

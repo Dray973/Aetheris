@@ -1,5 +1,5 @@
 """Built-in plugin: the top memory-consuming processes."""
-from aetheris.core.plugins import plugin, PluginContext
+from aetheris.core.plugins import PluginContext, plugin
 
 
 @plugin("top-memory", "List the 15 processes using the most memory")

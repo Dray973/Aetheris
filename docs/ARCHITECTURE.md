@@ -91,6 +91,8 @@ sequenceDiagram
 | core | `privileges` | admin check, UAC relaunch, enable named privileges |
 | core | `logbus` | structured, thread-safe audit event bus (Qt signals) |
 | core | `safety` | rollback ledger, System Restore point, `RegSaveKeyEx` snapshots |
+| core | `audit` | tamper-evident SHA-256 hash-chained audit log (verify + JSONL persist) |
+| core | `dryrun` | global dry-run flag; opted-in destructive ops log intent instead of acting |
 | core | `registry` | snapshot/diff (+ save/load, structured rows), privacy toggles, context-menu + cascading builder |
 | core | `settings` / `report` / `plugins` / `scheduler` | persisted prefs; CSV/JSON/HTML/MD serializers; text+widget plugin discovery; Task Scheduler integration |
 | core | `autoruns` / `updater` | logon/boot autostart enum + reversible disable; self-update (manifest check → stage → apply-on-next-launch) |

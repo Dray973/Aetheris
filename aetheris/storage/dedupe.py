@@ -12,11 +12,11 @@ user's explicit action in the UI.
 """
 from __future__ import annotations
 
-import os
 import hashlib
+import os
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from ..core import logbus
 

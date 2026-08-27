@@ -13,8 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..core import logbus
-from ..core import safety
+from ..core import dryrun, logbus, safety
 
 SRC = "network.firewall"
 
@@ -50,6 +49,8 @@ def isolate(app_path: str, label: str | None = None) -> IsolationResult:
     """Add BLOCK rules (in + out) for ``app_path``. Registers rollback."""
     label = label or app_path.rsplit("\\", 1)[-1]
     names: list[str] = []
+    if dryrun.skip(SRC, f"isolate {label} (block in+out)", app_path):
+        return IsolationResult(True, f"[dry-run] would isolate {label}", [])
     try:
         policy = _policy()
         rules = policy.Rules

@@ -14,13 +14,12 @@ Every disable registers an undo with the Omega Rollback ledger.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
-import json
 from dataclasses import dataclass
 
-from . import logbus
-from . import safety
+from . import dryrun, logbus, safety
 
 SRC = "core.autoruns"
 
@@ -147,6 +146,8 @@ def disable(entry: AutorunEntry) -> tuple[bool, str]:
         return False, "Windows only"
     if not entry.enabled:
         return False, "already disabled"
+    if dryrun.skip(SRC, f"disable autorun {entry.name}", entry.location):
+        return True, "[dry-run] not applied"
     if entry.kind == "folder":
         try:
             new = entry.path + ".disabled"
@@ -191,9 +192,11 @@ def enable(entry: AutorunEntry) -> tuple[bool, str]:
         return False, "Windows only"
     if entry.enabled:
         return False, "already enabled"
+    if dryrun.skip(SRC, f"enable autorun {entry.name}", entry.location):
+        return True, "[dry-run] not applied"
     if entry.kind == "folder":
         try:
-            original = entry.path[:-9] if entry.path.endswith(".disabled") else entry.path
+            original = entry.path.removesuffix(".disabled")
             os.replace(entry.path, original)
             logbus.action(SRC, f"enabled startup item: {entry.name}")
             return True, f"enabled {entry.name}"

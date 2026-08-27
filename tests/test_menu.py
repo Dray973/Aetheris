@@ -1,5 +1,5 @@
 """Cascading-menu spec parser (pure; cross-platform)."""
-from aetheris.core.registry import parse_menu_spec, MenuItem
+from aetheris.core.registry import MenuItem, parse_menu_spec
 
 
 def test_flat_leaves():

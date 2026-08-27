@@ -10,7 +10,7 @@ import pytest
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 
-from aetheris.network import etwbw, connections  # noqa: E402
+from aetheris.network import connections, etwbw
 
 
 def test_sampler_interface_and_lifecycle():

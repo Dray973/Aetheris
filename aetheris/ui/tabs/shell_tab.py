@@ -7,16 +7,29 @@ context-menu editor.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPushButton, QLabel,
-    QLineEdit, QComboBox, QPlainTextEdit, QListWidget, QListWidgetItem,
-    QMessageBox, QInputDialog, QFileDialog, QTableWidget, QTableWidgetItem,
-    QHeaderView, QCheckBox,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
-from ...core import registry, logbus, report
+from ...core import logbus, registry, report
 from ..workers import Worker
 
 _CHANGE_COLORS = {"Added": "#5ee0a0", "Modified": "#e0b341", "Removed": "#ff5d6c"}

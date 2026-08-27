@@ -18,10 +18,10 @@ with a status string when the session can't start.
 """
 from __future__ import annotations
 
-import time
 import atexit
 import ctypes
 import threading
+import time
 from ctypes import wintypes
 
 from ..core import logbus
