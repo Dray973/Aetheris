@@ -1,20 +1,24 @@
 """
-Per-process TCP bandwidth via ETW (Microsoft-Windows-Kernel-Network).
+Per-process TCP bandwidth via ETW (kernel SystemTraceProvider, TcpIp events).
 
 A real-time ETW consumer that attributes every TCP send/receive to its owning
-PID — the build-independent alternative to the (frequently gated) IP-Helper
+PID -- the build-independent alternative to the (frequently gated) IP-Helper
 EStats path. Works on client Windows, including builds where
 SetPerTcpConnectionEStats is disabled.
 
 Design:
-  * A private real-time trace session enables the Kernel-Network provider.
-  * ProcessTrace runs on a background thread; the EVENT_RECORD callback reads
-    the leading (PID, size) of each data-transfer event and accumulates
-    cumulative sent/recv bytes per PID under a lock.
+  * A private real-time *system-logger* session (EVENT_TRACE_SYSTEM_LOGGER_MODE)
+    enables the kernel network group via EnableFlags = NETWORK_TCPIP. The modern
+    manifest "Microsoft-Windows-Kernel-Network" provider does not emit TCP data
+    events to a private session, so the kernel group is used instead.
+  * ProcessTrace runs on a background thread; the EVENT_RECORD callback matches
+    the classic TcpIp send/recv *opcodes* (these data-transfer events carry
+    Id 0) and reads the leading (PID, size) of each, accumulating cumulative
+    sent/recv bytes per PID under a lock.
   * ``sample()`` returns {pid: (up_Bps, down_Bps)} as deltas since the last call.
 
-Requires an elevated token (ETW sessions do). Falls back to ``available=False``
-with a status string when the session can't start.
+Requires an elevated token (ETW system-logger sessions do). Falls back to
+``available=False`` with a status string when the session can't start.
 """
 from __future__ import annotations
 
@@ -29,19 +33,20 @@ from ..core import logbus
 SRC = "network.etwbw"
 
 EVENT_TRACE_REAL_TIME_MODE = 0x00000100
+EVENT_TRACE_SYSTEM_LOGGER_MODE = 0x02000000    # kernel events in a private session (Win8+)
+EVENT_TRACE_FLAG_NETWORK_TCPIP = 0x00010000    # SystemTraceProvider TcpIp/UdpIp group
 PROCESS_TRACE_MODE_REAL_TIME = 0x00000100
 PROCESS_TRACE_MODE_EVENT_RECORD = 0x10000000
 WNODE_FLAG_TRACED_GUID = 0x00020000
-EVENT_CONTROL_CODE_ENABLE_PROVIDER = 1
 EVENT_TRACE_CONTROL_STOP = 1
-TRACE_LEVEL_VERBOSE = 5
 ERROR_ALREADY_EXISTS = 183
 ERROR_ACCESS_DENIED = 5
 INVALID_HANDLE = 0xFFFFFFFFFFFFFFFF
 
 TRACEHANDLE = ctypes.c_ulonglong
-SEND_IDS = frozenset({10, 26})     # TCP data sent, IPv4 / IPv6
-RECV_IDS = frozenset({11, 27})     # TCP data received, IPv4 / IPv6
+# Classic kernel TcpIp events identify send/recv by EVENT opcode (their Id is 0).
+SEND_OPCODES = frozenset({10, 26})     # TCP data sent, IPv4 / IPv6
+RECV_OPCODES = frozenset({11, 27})     # TCP data received, IPv4 / IPv6
 
 _advapi32 = ctypes.WinDLL("advapi32", use_last_error=True) if \
     __import__("sys").platform == "win32" else None
@@ -50,12 +55,6 @@ _advapi32 = ctypes.WinDLL("advapi32", use_last_error=True) if \
 class GUID(ctypes.Structure):
     _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
                 ("Data3", wintypes.WORD), ("Data4", ctypes.c_ubyte * 8)]
-
-
-def _guid(s: str) -> GUID:
-    g = GUID()
-    ctypes.windll.ole32.CLSIDFromString(s, ctypes.byref(g))
-    return g
 
 
 class _WNODE_HEADER(ctypes.Structure):
@@ -124,14 +123,9 @@ class EVENT_TRACE_LOGFILEW(ctypes.Structure):
 _EVENT_RECORD_CALLBACK = ctypes.CFUNCTYPE(None, ctypes.POINTER(EVENT_RECORD))
 
 if _advapi32 is not None:
-    KERNEL_NETWORK_GUID = _guid("{7DD42A49-5329-4832-8DFD-43D979153A88}")
     _advapi32.StartTraceW.argtypes = [ctypes.POINTER(TRACEHANDLE), wintypes.LPCWSTR,
                                       ctypes.POINTER(EVENT_TRACE_PROPERTIES)]
     _advapi32.StartTraceW.restype = wintypes.ULONG
-    _advapi32.EnableTraceEx2.argtypes = [TRACEHANDLE, ctypes.POINTER(GUID), wintypes.ULONG,
-                                         ctypes.c_ubyte, ctypes.c_ulonglong,
-                                         ctypes.c_ulonglong, wintypes.ULONG, ctypes.c_void_p]
-    _advapi32.EnableTraceEx2.restype = wintypes.ULONG
     _advapi32.OpenTraceW.argtypes = [ctypes.POINTER(EVENT_TRACE_LOGFILEW)]
     _advapi32.OpenTraceW.restype = TRACEHANDLE
     _advapi32.ProcessTrace.argtypes = [ctypes.POINTER(TRACEHANDLE), wintypes.ULONG,
@@ -174,11 +168,12 @@ class EtwBandwidth:
         p.Wnode.BufferSize = size
         p.Wnode.Flags = WNODE_FLAG_TRACED_GUID
         p.Wnode.ClientContext = 1                    # QPC timestamps
-        p.BufferSize = 64
-        p.MinimumBuffers = 4
-        p.MaximumBuffers = 16
+        p.BufferSize = 128
+        p.MinimumBuffers = 8
+        p.MaximumBuffers = 32
         p.FlushTimer = 1                             # flush real-time buffers every 1 s
-        p.LogFileMode = EVENT_TRACE_REAL_TIME_MODE
+        p.EnableFlags = EVENT_TRACE_FLAG_NETWORK_TCPIP   # kernel TcpIp/UdpIp group
+        p.LogFileMode = EVENT_TRACE_REAL_TIME_MODE | EVENT_TRACE_SYSTEM_LOGGER_MODE
         p.LoggerNameOffset = ctypes.sizeof(EVENT_TRACE_PROPERTIES)
         return buf, props
 
@@ -196,15 +191,6 @@ class EtwBandwidth:
             return
         self._props_buf = buf
 
-        rc = _advapi32.EnableTraceEx2(
-            self._session, ctypes.byref(KERNEL_NETWORK_GUID),
-            EVENT_CONTROL_CODE_ENABLE_PROVIDER, TRACE_LEVEL_VERBOSE,
-            0xFFFFFFFFFFFFFFFF, 0, 0, None)
-        if rc != 0:
-            self.status = f"EnableTraceEx2 failed (rc={rc})"
-            self._stop_session()
-            return
-
         logfile = EVENT_TRACE_LOGFILEW()
         logfile.LoggerName = self.name
         logfile.ProcessTraceMode = (PROCESS_TRACE_MODE_REAL_TIME |
@@ -220,9 +206,9 @@ class EtwBandwidth:
         self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
         self.available = True
-        self.status = "ETW (Kernel-Network) live"
+        self.status = "ETW (kernel TcpIp) live"
         atexit.register(self.stop)
-        logbus.success(SRC, "per-process bandwidth: ETW session live")
+        logbus.success(SRC, "per-process bandwidth: ETW kernel-network session live")
 
     def _pump(self) -> None:
         h = TRACEHANDLE(self._htrace)
@@ -250,9 +236,9 @@ class EtwBandwidth:
     def _on_event(self, rec_ptr) -> None:
         try:
             rec = rec_ptr.contents
-            eid = rec.EventHeader.EventDescriptor.Id
-            send = eid in SEND_IDS
-            if not send and eid not in RECV_IDS:
+            op = rec.EventHeader.EventDescriptor.Opcode
+            send = op in SEND_OPCODES
+            if not send and op not in RECV_OPCODES:
                 return
             if rec.UserDataLength < 8 or not rec.UserData:
                 return
