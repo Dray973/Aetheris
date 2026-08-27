@@ -56,7 +56,13 @@ def _gen(cmd: str, fmt: str) -> tuple[str, str]:
 
 def _timestamped(path: str) -> str:
     p = Path(path)
-    return str(p.with_name(f"{p.stem}-{time.strftime('%Y%m%d-%H%M%S')}{p.suffix}"))
+    base = f"{p.stem}-{time.strftime('%Y%m%d-%H%M%S')}"
+    cand = p.with_name(f"{base}{p.suffix}")
+    i = 1
+    while cand.exists():                      # avoid collisions on rapid captures
+        cand = p.with_name(f"{base}-{i}{p.suffix}")
+        i += 1
+    return str(cand)
 
 
 def _emit(content: str, out: str | None, stamp: bool) -> None:
