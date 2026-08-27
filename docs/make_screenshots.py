@@ -146,6 +146,15 @@ def main() -> None:
     aut._compile()
     w.tabs.setCurrentIndex(4); pump(0.3); shot("05-autoshell.png")
 
+    # 6) Plugins - run the live-gauges widget plugin so the shot shows a widget
+    plugins_tab = w.tabs.widget(5)
+    for i in range(plugins_tab.list.count()):
+        if plugins_tab.list.item(i).text() == "system-gauges":
+            plugins_tab.list.setCurrentRow(i)
+            plugins_tab._run()
+            break
+    w.tabs.setCurrentIndex(5); pump(0.5); shot("06-plugins.png")
+
     if "--gif" in sys.argv:
         _build_gif()
     print("done")
@@ -158,7 +167,7 @@ def _build_gif() -> None:
         print("Pillow not installed; skipping GIF")
         return
     order = ["01-memory.png", "02-storage-treemap.png", "03-network.png",
-             "04-shell.png", "05-autoshell.png"]
+             "04-shell.png", "05-autoshell.png", "06-plugins.png"]
     imgs = []
     for f in order:
         im = Image.open(OUT / f).convert("RGB")

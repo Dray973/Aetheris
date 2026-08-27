@@ -17,13 +17,14 @@ control.
 
 ![Aetheris Quantum Core walkthrough](docs/screenshots/walkthrough.gif)
 
-The five module workspaces, rendered from the real app (representative data
-shown in place of live machine data):
+The module workspaces, rendered from the real app (representative data shown in
+place of live machine data):
 
 | | |
 |---|---|
 | ![Memory](docs/screenshots/01-memory.png) **① Memory / Process Autopsy** — process table, ASLR/DEP/signature columns, live CPU/RAM chart, Assembly Studio, and the audit console. | ![Storage](docs/screenshots/02-storage-treemap.png) **② Storage / MFT** — squarified space-utilization tree-map with drill-down. |
-| ![Network](docs/screenshots/03-network.png) **③ Network / Firewall** — socket→process table with GeoIP + per-process B/s columns, live throughput chart, "Nuke" isolation. | ![Auto-Shell](docs/screenshots/05-autoshell.png) **⑤ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. |
+| ![Network](docs/screenshots/03-network.png) **③ Network / Firewall** — socket→process table with GeoIP + per-process B/s columns, live throughput chart, "Nuke" isolation. | ![Shell](docs/screenshots/04-shell.png) **④ Shell / Registry** — snapshot-diff suite, privacy toggles, cascading menus, and the Autoruns manager. |
+| ![Auto-Shell](docs/screenshots/05-autoshell.png) **⑤ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. | ![Plugins](docs/screenshots/06-plugins.png) **⚙ Plugins** — text + widget extension tools (here the live-gauges widget), runnable in-app and via `aetheris-cli`. |
 
 Regenerate with `python docs/make_screenshots.py --gif`. For a live, auto-
 cycling demo to screen-record, run `python docs/demo_mode.py`. The layered
