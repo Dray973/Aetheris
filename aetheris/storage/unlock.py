@@ -9,10 +9,13 @@ guardrails are enforced here in code, not just in the UI:
   * CRITICAL_PROCESSES — refuses to close handles held by / terminate the
     processes whose death bugchecks or destabilizes Windows.
 
-Locker discovery uses psutil's per-process open-file view. Raw handle stripping
-via DuplicateHandle(DUPLICATE_CLOSE_SOURCE) over the global handle table is the
-deeper increment (stubbed at ``_strip_handle_raw``); the shipped path either
-asks the locking process to release, or terminates a non-critical locker.
+Locker discovery and raw handle stripping live in ``storage.handles``:
+``locking_processes`` finds the holders and ``strip_file_handles`` force-closes
+their handles with DuplicateHandle(DUPLICATE_CLOSE_SOURCE) over the global handle
+table (``NtQuerySystemInformation``), refusing critical processes. This module
+wraps them in the confirm/guardrail/obliterate flow; the shipped obliterator can
+ask a locking process to release, terminate a non-critical locker, or strip
+handles before deleting.
 """
 from __future__ import annotations
 
