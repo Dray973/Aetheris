@@ -19,7 +19,7 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from ..core import logbus
+from ..core import dryrun, logbus
 
 SRC = "automation.nlshell"
 
@@ -288,6 +288,8 @@ def run(cmd: CompiledCommand, timeout: int = 120) -> tuple[bool, str]:
     """Execute a compiled command's script. UI calls this only post-confirmation."""
     if not cmd.matched or not cmd.script:
         return False, "nothing to run"
+    if dryrun.skip(SRC, f"execute intent {cmd.intent}", cmd.script):
+        return True, f"[dry-run] would execute:\n{cmd.script}"
     logbus.action(SRC, f"executing intent {cmd.intent}")
     try:
         proc = subprocess.run(

@@ -15,7 +15,7 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 
-from ..core import logbus
+from ..core import dryrun, logbus
 from ..core import winapi as W
 
 SRC = "forensics.disasm"
@@ -100,6 +100,9 @@ def patch_memory(pid: int, address: int, data: bytes) -> tuple[bool, str]:
     Write ``data`` at ``address`` in process ``pid``. UI-gated behind confirm.
     Logs the exact bytes written for the audit trail.
     """
+    if dryrun.skip(SRC, f"patch pid {pid} @ 0x{address:x} ({len(data)} bytes)",
+                   data.hex(" ")):
+        return True, f"[dry-run] would write {len(data)} bytes to pid {pid} @ 0x{address:x}"
     if not W.IS_WINDOWS:
         return False, "Windows only"
     access = W.PROCESS_VM_WRITE | W.PROCESS_VM_OPERATION | W.PROCESS_QUERY_INFORMATION

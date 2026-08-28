@@ -304,6 +304,8 @@ def apply_privacy_toggle(key: str) -> tuple[bool, str]:
 
 def disable_diagtrack_service() -> tuple[bool, str]:
     """Stop + disable the DiagTrack (Connected User Experiences) service."""
+    if dryrun.skip(SRC, "stop + disable the DiagTrack service"):
+        return True, "[dry-run] would stop + disable DiagTrack"
     import subprocess
     try:
         subprocess.run(["sc", "stop", "DiagTrack"], capture_output=True, text=True, timeout=30)
@@ -353,6 +355,8 @@ def add_context_command(label: str, command: str,
     """
     if winreg is None:
         return False, "Windows only"
+    if dryrun.skip(SRC, f"add context command {label!r} under {target}", command):
+        return True, f"[dry-run] would add context command {label!r}"
     base = fr"{target}\shell\{label}"
     try:
         k = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, base)
@@ -456,6 +460,8 @@ def add_cascading_menu(top_label: str, items: list[MenuItem],
         return False, "Windows only"
     if not items:
         return False, "no menu items"
+    if dryrun.skip(SRC, f"add cascading menu {top_label!r} ({len(items)} items) under {target}"):
+        return True, f"[dry-run] would add cascading menu {top_label!r}"
     key_name = _sanitize(key_name or ("Aetheris." + top_label))
     store_roots: list[str] = [key_name]
 

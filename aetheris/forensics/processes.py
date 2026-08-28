@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass
 
 import psutil
 
-from ..core import logbus
+from ..core import dryrun, logbus
 from ..core import winapi as W
 
 SRC = "forensics.processes"
@@ -121,6 +121,8 @@ def snapshot(enrich: bool = False) -> list[ProcessInfo]:
 
 def kill(pid: int) -> tuple[bool, str]:
     """Terminate a process by pid (with a hard kill fallback)."""
+    if dryrun.skip(SRC, f"terminate pid {pid}"):
+        return True, f"[dry-run] would terminate pid {pid}"
     try:
         p = psutil.Process(pid)
         name = p.name()
