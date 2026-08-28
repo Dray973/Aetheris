@@ -85,7 +85,11 @@ class ShellTab(QWidget):
 
     def _refresh_autoruns(self) -> None:
         from ...core import autoruns
-        self._autoruns = autoruns.enumerate_entries()
+        self.autoruns_count.setText("enumerating…")
+        self._run(autoruns.enumerate_entries, self._show_autoruns)
+
+    def _show_autoruns(self, entries) -> None:
+        self._autoruns = entries
         t = self.autoruns_table
         t.setRowCount(len(self._autoruns))
         for i, e in enumerate(self._autoruns):
@@ -188,6 +192,16 @@ class ShellTab(QWidget):
         views.addTab(self.diff_out, "Markdown")
         v.addWidget(views)
         return w
+
+    def _run(self, fn, on_done, *args) -> None:
+        """Run a blocking native call on the shared Worker (keeps the UI live)."""
+        if self._worker and self._worker.isRunning():
+            self._toast(False, "a task is already running")
+            return
+        self._worker = Worker(fn, *args)
+        self._worker.done.connect(on_done)
+        self._worker.failed.connect(lambda e: self._toast(False, e))
+        self._worker.start()
 
     def _take_snapshot(self) -> None:
         root, sub = self.root_box.currentText(), self.subkey.text().strip()
@@ -334,7 +348,11 @@ class ShellTab(QWidget):
                                 "Stop and disable the DiagTrack service?") \
                 != QMessageBox.StandardButton.Yes:
             return
-        ok, msg = registry.disable_diagtrack_service()
+        # Two `sc` calls at 30 s timeout each -> offload so the UI never freezes.
+        self._run(registry.disable_diagtrack_service, self._show_diagtrack)
+
+    def _show_diagtrack(self, res) -> None:
+        ok, msg = res
         self._toast(ok, msg)
 
     # -- context menu -------------------------------------------------------

@@ -197,11 +197,15 @@ class NetworkTab(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
-        res = firewall.isolate(exe)
+        self._run(firewall.isolate, self._show_isolate, exe)   # COM can block
+
+    def _show_isolate(self, res) -> None:
         self._toast(res.ok, res.message)
 
     def _unisolate(self) -> None:
-        active = firewall.list_isolation_rules()
+        self._run(firewall.list_isolation_rules, self._pick_and_deisolate)
+
+    def _pick_and_deisolate(self, active) -> None:
         if not active:
             self._toast(True, "no active Aetheris isolation rules")
             return
@@ -211,8 +215,21 @@ class NetworkTab(QWidget):
         from PyQt6.QtWidgets import QInputDialog
         label, ok = QInputDialog.getItem(self, "Un-isolate", "Application:", labels, 0, False)
         if ok and label:
-            good, msg = firewall.deisolate(label)
-            self._toast(good, msg)
+            self._run(firewall.deisolate, self._show_deisolate, label)
+
+    def _show_deisolate(self, res) -> None:
+        good, msg = res
+        self._toast(good, msg)
+
+    def _run(self, fn, on_done, *args) -> None:
+        """Run a blocking native/COM call on the shared Worker."""
+        if self._worker and self._worker.isRunning():
+            self._toast(False, "a task is already running")
+            return
+        self._worker = Worker(fn, *args)
+        self._worker.done.connect(on_done)
+        self._worker.failed.connect(lambda e: self._toast(False, e))
+        self._worker.start()
 
     def _toast(self, ok: bool, msg: str) -> None:
         (logbus.success if ok else logbus.error)("ui.network", msg)

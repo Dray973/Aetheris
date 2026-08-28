@@ -141,7 +141,12 @@ class StorageTab(QWidget):
     def _build_treemap(self) -> None:
         if not self._mft_records:
             return
-        root = mft.build_tree(self._mft_records)
+        self.tm_build.setEnabled(False)                 # busy: tree build is CPU-heavy
+        self._run(mft.build_tree, self._show_treemap, self._mft_records)
+        if self._worker:                                # re-enable on success *or* error
+            self._worker.finished.connect(lambda: self.tm_build.setEnabled(True))
+
+    def _show_treemap(self, root) -> None:
         self.treemap.set_root(root)
         self._toast(True, f"tree-map: {_human(root.total_size)} across "
                           f"{len(root.children)} top-level entries")
@@ -255,7 +260,10 @@ class StorageTab(QWidget):
         path = self.oblit_path.text().strip()
         if not path:
             return
-        lockers = unlock.find_lockers(path)
+        self.oblit_out.setPlainText("finding lockers…")     # Restart-Manager can block
+        self._run(unlock.find_lockers, self._show_lockers, path)
+
+    def _show_lockers(self, lockers) -> None:
         if not lockers:
             self.oblit_out.setPlainText("No processes currently hold this file open.")
             return
@@ -276,12 +284,22 @@ class StorageTab(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
-        if self.kill_lockers.isChecked():
-            for pid, ok, msg in unlock.release_lockers(path, terminate=True):
-                logbus.log("ui.storage", f"locker {pid}: {msg}")
-        ok, msg = unlock.obliterate(
-            path, confirm=True, take_own=self.take_own.isChecked(),
-            strip_handles_first=self.strip_handles_cb.isChecked())
+        kill = self.kill_lockers.isChecked()
+        take = self.take_own.isChecked()
+        strip = self.strip_handles_cb.isChecked()
+        self.oblit_out.setPlainText("obliterating…")
+
+        def job():
+            if kill:
+                for pid, _ok, msg in unlock.release_lockers(path, terminate=True):
+                    logbus.log("ui.storage", f"locker {pid}: {msg}")
+            return unlock.obliterate(path, confirm=True, take_own=take,
+                                     strip_handles_first=strip)
+
+        self._run(job, self._show_oblit)
+
+    def _show_oblit(self, res) -> None:
+        ok, msg = res
         self.oblit_out.appendPlainText(msg)
         self._toast(ok, msg)
 
@@ -298,7 +316,10 @@ class StorageTab(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
-        results = unlock.strip_handles(path)
+        self.oblit_out.setPlainText("closing handles…")     # busy: table walk can be slow
+        self._run(unlock.strip_handles, self._show_strip, path)
+
+    def _show_strip(self, results) -> None:
         if not results:
             self.oblit_out.setPlainText("No closable handles found for this file.")
             return

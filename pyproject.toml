@@ -39,7 +39,7 @@ full = [
     "aetheris-quantum-core[recommended,forensics]",
 ]
 # Test tooling.
-test = ["pytest>=7.4", "hypothesis>=6.0"]
+test = ["pytest>=7.4", "hypothesis>=6.0", "pytest-qt>=4.2"]
 # One-file executable build tooling.
 build-exe = ["pyinstaller>=6.0"]
 

@@ -1,0 +1,100 @@
+"""GUI-thread offloading: destructive/slow native calls must run on a Worker,
+not block the event loop.
+
+Each test monkeypatches the native call to an Event-gated blocker, fires the
+slot, and asserts (a) the slot returns while the native call is still blocked,
+(b) the native call ran on a *worker* thread (not the GUI thread), and (c) the
+result is delivered via the Worker's ``done`` signal. Windows-only because the
+tabs import the native (ctypes) layers at construction.
+"""
+import os
+import sys
+import threading
+
+import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")   # headless, before any Qt import
+
+pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="native tabs are Windows-only")
+
+
+def _assert_offloaded(qtbot, tab, fire, patch_target, attr, monkeypatch, result):
+    """Patch <patch_target>.<attr> to a blocker, fire the slot, and prove the
+    call was pushed onto a Worker instead of running on the GUI thread."""
+    entered = threading.Event()
+    release = threading.Event()
+    seen: dict[str, str] = {}
+
+    def blocker(*_a, **_k):
+        seen["thread"] = threading.current_thread().name
+        entered.set()
+        release.wait(timeout=5)          # hold the "native" call open
+        return result
+
+    monkeypatch.setattr(patch_target, attr, blocker)
+    gui_thread = threading.current_thread().name
+
+    if tab._worker is not None:
+        tab._worker.wait(5000)           # let any construction-time refresh finish
+    fire()                               # the slot under test -- must return at once
+    try:
+        assert entered.wait(2.0), "native call never started on a worker"
+        assert seen["thread"] != gui_thread, "native call ran on the GUI thread"
+        worker = tab._worker
+        assert worker is not None and worker.isRunning()
+        with qtbot.waitSignal(worker.done, timeout=5000):
+            release.set()                # release inside the wait so we don't miss done
+    finally:
+        release.set()
+        if tab._worker is not None:
+            tab._worker.wait(6000)       # let the thread finish before teardown
+
+
+def test_strip_handles_offloaded(qtbot, monkeypatch, tmp_path):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from aetheris.storage import unlock
+    from aetheris.ui.tabs.storage_tab import StorageTab
+
+    f = tmp_path / "target.bin"
+    f.write_bytes(b"x")
+    tab = StorageTab()
+    qtbot.addWidget(tab)
+    tab.oblit_path.setText(str(f))
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+
+    _assert_offloaded(qtbot, tab, tab._strip_handles, unlock, "strip_handles",
+                      monkeypatch, result=[(4321, 0xABCD, True, "closed")])
+
+
+def test_disable_diagtrack_offloaded(qtbot, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from aetheris.core import registry
+    from aetheris.ui.tabs.shell_tab import ShellTab
+
+    tab = ShellTab()
+    qtbot.addWidget(tab)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+
+    _assert_offloaded(qtbot, tab, tab._disable_diagtrack, registry,
+                      "disable_diagtrack_service", monkeypatch, result=(True, "disabled"))
+
+
+def test_trim_working_sets_offloaded(qtbot, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from aetheris.forensics import memory
+    from aetheris.ui.tabs.memory_tab import MemoryTab
+
+    tab = MemoryTab()
+    qtbot.addWidget(tab)
+    tab._timer.stop()                    # no 4 s auto-refresh during the test
+    tab._tele_timer.stop()
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+
+    _assert_offloaded(qtbot, tab, tab._trim_all, memory, "empty_all_working_sets",
+                      monkeypatch, result=(3, 5))

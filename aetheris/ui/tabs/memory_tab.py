@@ -234,7 +234,10 @@ class MemoryTab(QWidget):
                              "Trim EVERY accessible process working set? "
                              "(reversible; causes a brief latency spike)"):
             return
-        ok, attempted = memory.empty_all_working_sets()
+        self._run(memory.empty_all_working_sets, self._show_trim)   # walks all procs
+
+    def _show_trim(self, res) -> None:
+        ok, attempted = res
         self._toast(True, f"trimmed {ok}/{attempted} processes")
 
     def _purge_standby(self) -> None:
@@ -258,12 +261,26 @@ class MemoryTab(QWidget):
             self._toast(False, "address must be hex, e.g. 0x7ff6abcd0000")
             return None
 
+    def _run(self, fn, on_done, *args) -> None:
+        """Run a blocking native call on the shared Worker (keeps the UI live)."""
+        if self._worker and self._worker.isRunning():
+            self._toast(False, "a task is already running")
+            return
+        self._worker = Worker(fn, *args)
+        self._worker.done.connect(on_done)
+        self._worker.failed.connect(lambda e: self._toast(False, e))
+        self._worker.start()
+
     def _disassemble(self) -> None:
         pid = self._selected_pid()
         addr = self._parse_addr()
         if pid is None or addr is None:
             return
-        lines = disasm.disassemble_process(pid, addr, self.nbytes.value())
+        self.disasm_view.setPlainText("disassembling…")
+        self._run(disasm.disassemble_process, self._show_disasm,
+                  pid, addr, self.nbytes.value())
+
+    def _show_disasm(self, lines) -> None:
         self.disasm_view.setPlainText("\n".join(lines))
 
     def _patch(self) -> None:
