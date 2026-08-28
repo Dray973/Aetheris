@@ -4,6 +4,7 @@ Pure hashlib/json -- no Qt, no Windows. Proves that any edit, deletion, or
 reorder of the recorded audit trail is detectable via the SHA-256 chain.
 """
 import dataclasses
+import os
 from itertools import pairwise
 
 from aetheris.core import audit, logbus
@@ -57,6 +58,7 @@ def test_persistence_round_trip(tmp_path):
     log = audit.AuditLog(path=str(p))
     _fill(log, 4)
     assert p.exists()
+    log.close()
     reloaded = audit.AuditLog.load(str(p))
     assert len(reloaded) == 4
     ok, bad = reloaded.verify()
@@ -68,6 +70,7 @@ def test_on_disk_tamper_is_detected(tmp_path):
     p = tmp_path / "audit.jsonl"
     log = audit.AuditLog(path=str(p))
     _fill(log, 4)
+    log.close()
     # Edit the persisted line for seq 1 without fixing its hash.
     lines = p.read_text(encoding="utf-8").splitlines()
     lines[1] = lines[1].replace("message 1", "message HACKED")
@@ -75,6 +78,42 @@ def test_on_disk_tamper_is_detected(tmp_path):
     reloaded = audit.AuditLog.load(str(p))
     ok, bad = reloaded.verify()
     assert not ok and bad == 1
+
+
+def test_verify_audit_log_file_clean_and_tampered(tmp_path):
+    p = tmp_path / "audit" / "session.jsonl"           # dir must be auto-created
+    log = audit.AuditLog(path=str(p))
+    _fill(log, 4)
+    log.close()
+    assert audit.verify_audit_log(str(p)) == (True, -1)
+    lines = p.read_text(encoding="utf-8").splitlines()
+    lines[2] = lines[2].replace("message 2", "message X")   # forge seq 2, keep hash
+    p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert audit.verify_audit_log(str(p)) == (False, 2)
+
+
+def test_verify_audit_log_missing_file_is_false(tmp_path):
+    assert audit.verify_audit_log(str(tmp_path / "nope.jsonl")) == (False, -1)
+
+
+def test_start_persistence_flushes_backlog_and_new(tmp_path):
+    p = tmp_path / "audit" / "session.jsonl"
+    log = audit.AuditLog()                              # in-memory, no path yet
+    _fill(log, 2)                                       # backlog before persistence
+    assert log.start_persistence(str(p))
+    log.append("ACTION", "srcN", "later event")        # one more after enabling
+    log.close()
+    reloaded = audit.AuditLog.load(str(p))
+    assert len(reloaded) == 3                           # 2 backlog + 1 new persisted
+    assert reloaded.verify() == (True, -1)
+
+
+def test_session_log_path_layout(tmp_path):
+    path = audit.session_log_path(str(tmp_path))
+    assert path.startswith(str(tmp_path))
+    assert os.sep + "audit" + os.sep in path
+    base = os.path.basename(path)
+    assert base.startswith("session-") and base.endswith(".jsonl")
 
 
 def test_append_event_adapts_a_logbus_event():

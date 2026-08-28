@@ -34,6 +34,9 @@ DEFAULTS: dict[str, Any] = {
     "network_resolve_dns": False,
     "mft_volume": r"\\.\C:",
     "mft_max_records": 20000,
+    # Persist the tamper-evident audit chain to a per-session JSONL file under
+    # %APPDATA%\AetherisQuantumCore\audit\ so a forensic record survives close.
+    "audit_persist": True,
     # Auto-update source: a public GitHub repo (github:owner/repo) or a
     # version.json URL (https:// / file://). Public repo required (no auth).
     "update_url": "github:Dray973/Aetheris",

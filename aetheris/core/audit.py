@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import threading
 import time
 from dataclasses import asdict, dataclass
+from typing import TextIO
 
 GENESIS_HASH = "0" * 64
 SRC = "core.audit"
@@ -51,7 +53,10 @@ class AuditLog:
     def __init__(self, path: str | None = None) -> None:
         self._records: list[AuditRecord] = []
         self._lock = threading.Lock()
-        self._path = path
+        self._path: str | None = None
+        self._fh: TextIO | None = None
+        if path:
+            self._open(path)
 
     def append(self, level: str, source: str, message: str,
                detail: str = "", ts: float | None = None) -> AuditRecord:
@@ -93,15 +98,54 @@ class AuditLog:
             return len(self._records)
 
     # -- persistence --------------------------------------------------------
+    def _open(self, path: str) -> bool:
+        """Open a line-buffered append handle, kept open for the session so each
+        record is one cheap `write` (no per-event open/close), never blocking."""
+        try:
+            parent = os.path.dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            self._fh = open(path, "a", encoding="utf-8", newline="\n", buffering=1)
+            self._path = path
+            return True
+        except OSError:
+            self._fh = None
+            self._path = None
+            return False
+
     def _persist(self, rec: AuditRecord) -> None:
-        path = self._path
-        if path is None:
+        fh = self._fh
+        if fh is None:
             return
         try:
-            with open(path, "a", encoding="utf-8", newline="\n") as fh:
-                fh.write(json.dumps(asdict(rec), ensure_ascii=True) + "\n")
+            fh.write(json.dumps(asdict(rec), ensure_ascii=True) + "\n")
         except OSError:
             pass  # persistence is best-effort; the in-memory chain still stands
+
+    def start_persistence(self, path: str) -> bool:
+        """Begin persisting to *path*, flushing any already-buffered records first
+        so the on-disk chain is complete. Safe to call once at app start."""
+        with self._lock:
+            if not self._open(path):
+                return False
+            for rec in self._records:      # write the backlog before new events
+                self._persist(rec)
+            return True
+
+    def close(self) -> None:
+        with self._lock:
+            if self._fh is not None:
+                try:
+                    self._fh.close()
+                except OSError:
+                    pass
+                self._fh = None
+
+    def __del__(self) -> None:            # best-effort handle release
+        try:
+            self.close()
+        except Exception:
+            pass
 
     @classmethod
     def load(cls, path: str) -> AuditLog:
@@ -119,6 +163,22 @@ class AuditLog:
                     d["message"], d["detail"], d["prev_hash"], d["hash"],
                 ))
         return log
+
+
+def session_log_path(base_dir: str) -> str:
+    """Path for this session's audit file: ``<base_dir>/audit/session-<ts>.jsonl``."""
+    return os.path.join(base_dir, "audit",
+                        f"session-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
+
+
+def verify_audit_log(path: str) -> tuple[bool, int]:
+    """Walk a persisted audit file and report ``(ok, first_bad_seq)``; ``(True, -1)``
+    when intact. Returns ``(False, -1)`` if the file can't be read or parsed."""
+    try:
+        log = AuditLog.load(path)
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
+        return False, -1
+    return log.verify()
 
 
 # Process-wide audit trail for the running session.

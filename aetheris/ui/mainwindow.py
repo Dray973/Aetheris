@@ -43,6 +43,12 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         audit.wire_to_logbus()   # hash-chain every audit event from here on
+        self._audit_path: str | None = None
+        if settings().get("audit_persist", True):
+            path = audit.session_log_path(str(settings().path.parent))
+            if audit.audit.start_persistence(path):
+                self._audit_path = path
+                logbus.trace("ui.main", f"audit log persisting to {path}")
         self.setWindowTitle("Aetheris Quantum Core — Advanced Systems Instrumentation Suite")
         self.resize(1400, 900)
         if ICON_PATH.exists():
@@ -83,6 +89,10 @@ class MainWindow(QMainWindow):
             sampler = getattr(self.tabs.widget(2), "_ppbw", None)
             if sampler and hasattr(sampler, "stop"):
                 sampler.stop()
+        except Exception:
+            pass
+        try:
+            audit.audit.close()          # flush + release the audit file handle
         except Exception:
             pass
         super().closeEvent(event)
@@ -150,12 +160,13 @@ class MainWindow(QMainWindow):
         log = audit.audit
         ok, bad = log.verify()
         n = len(log)
+        where = f"\n\nSession log: {self._audit_path}" if self._audit_path else ""
         if ok:
             logbus.success("ui.main", f"audit log verified: {n} record(s), chain intact")
             QMessageBox.information(
                 self, "Audit log integrity",
                 f"Tamper-evident audit log intact.\n\n{n} record(s); "
-                "SHA-256 hash chain verified end to end.")
+                f"SHA-256 hash chain verified end to end.{where}")
         else:
             logbus.error("ui.main", f"audit log INTEGRITY FAILURE at record {bad}")
             QMessageBox.critical(
