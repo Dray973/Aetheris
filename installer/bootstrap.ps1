@@ -21,25 +21,41 @@ function Write-Warn($msg) { Write-Host "  ! $msg" -ForegroundColor Yellow }
 function Write-Ok($msg)   { Write-Host "  + $msg" -ForegroundColor Green }
 
 # --- 1. Locate or install Python 3.10+ ------------------------------------
-function Get-PythonExe {
-    # Prefer the py launcher, then python on PATH; require >= 3.10.
-    foreach ($cand in @(
-        @{ Exe = 'py';     Args = @('-3') },
-        @{ Exe = 'python'; Args = @() }
-    )) {
-        $exe = Get-Command $cand.Exe -ErrorAction SilentlyContinue
-        if (-not $exe) { continue }
-        try {
-            $ver = & $exe.Source @($cand.Args + @('-c',
-                'import sys;print("%d.%d"%sys.version_info[:2])')) 2>$null
-            if ($LASTEXITCODE -eq 0 -and $ver) {
-                $parts = $ver.Trim().Split('.')
-                if ([int]$parts[0] -ge 3 -and [int]$parts[1] -ge 10) {
-                    # Return an invokable command line.
-                    return @($exe.Source) + $cand.Args
-                }
+function Test-PyVersion($exe, $prefix) {
+    # Run the candidate; return $true only if it is a working Python >= 3.10.
+    try {
+        $ver = & $exe @($prefix + @('-c',
+            'import sys;print("%d.%d"%sys.version_info[:2])')) 2>$null
+        if ($LASTEXITCODE -eq 0 -and $ver) {
+            $p = $ver.Trim().Split('.')
+            if (([int]$p[0] -gt 3) -or ([int]$p[0] -eq 3 -and [int]$p[1] -ge 10)) {
+                return $true
             }
-        } catch { }
+        }
+    } catch { }
+    return $false
+}
+
+function Get-PythonExe {
+    # 1) py launcher (usually C:\Windows\py.exe -- on PATH even when python isn't).
+    $py = Get-Command py -ErrorAction SilentlyContinue
+    if ($py -and (Test-PyVersion $py.Source @('-3'))) { return @($py.Source, '-3') }
+    # 2) python on PATH.
+    $pyth = Get-Command python -ErrorAction SilentlyContinue
+    if ($pyth -and (Test-PyVersion $pyth.Source @())) { return @($pyth.Source) }
+    # 3) Known install locations -- finds a just-installed (winget/python.org) or
+    #    manually-installed Python that is not yet on THIS session's PATH.
+    $globs = @()
+    if ($env:LOCALAPPDATA)        { $globs += (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python3*\python.exe') }
+    if ($env:ProgramFiles)        { $globs += (Join-Path $env:ProgramFiles 'Python3*\python.exe') }
+    if (${env:ProgramFiles(x86)}) { $globs += (Join-Path ${env:ProgramFiles(x86)} 'Python3*\python.exe') }
+    $globs += 'C:\Python3*\python.exe'
+    foreach ($g in $globs) {
+        $hits = Get-ChildItem -Path $g -ErrorAction SilentlyContinue |
+                Sort-Object FullName -Descending      # prefer newest (Python312 > 310)
+        foreach ($h in $hits) {
+            if (Test-PyVersion $h.FullName @()) { return @($h.FullName) }
+        }
     }
     return $null
 }
@@ -63,13 +79,17 @@ if (-not $python) {
             '/quiet InstallAllUsers=0 PrependPath=1 Include_test=0'
         Remove-Item $tmp -ErrorAction SilentlyContinue
     }
-    # Re-probe (new PATH may need this process to re-read env).
+    # Refresh this session's PATH from the registry, then re-probe. Get-PythonExe
+    # also scans install locations, so a Python that never got added to PATH
+    # (common with winget's per-user install) is still found.
     $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
                 [System.Environment]::GetEnvironmentVariable('Path','User')
     $python = Get-PythonExe
     if (-not $python) {
-        throw "Python installation did not complete. Please install Python 3.12 " +
-              "from python.org and re-run the installer."
+        throw "Could not locate Python 3.10+ even after installation. Install " +
+              "Python 3.12 from python.org (tick 'Add python.exe to PATH') and " +
+              "re-run -- or just use the standalone AetherisQuantumCore.exe, " +
+              "which bundles Python and needs no install."
     }
 }
 Write-Ok ("Using Python: " + ($python -join ' '))
