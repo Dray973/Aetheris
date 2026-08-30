@@ -117,3 +117,23 @@ def test_service_control_offloaded(qtbot, monkeypatch):
 
     _assert_offloaded(qtbot, tab, lambda: tab._svc_control("start"), services,
                       "start_service", monkeypatch, result=(True, "started"))
+
+
+def test_task_control_offloaded(qtbot, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from aetheris.core import taskaudit
+    from aetheris.core.taskaudit import TaskInfo
+    from aetheris.ui.tabs.shell_tab import ShellTab
+
+    tab = ShellTab()
+    qtbot.addWidget(tab)
+    tab._tasks = [TaskInfo(r"\Evil", "Evil", "", "", True, False,
+                           ["logon"], ["x.exe"], ["x.exe"])]
+    tab._apply_task_filter()
+    tab.task_table.selectRow(0)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+
+    _assert_offloaded(qtbot, tab, lambda: tab._task_control(False), taskaudit,
+                      "disable_task", monkeypatch, result=(True, "disabled"))
