@@ -14,11 +14,24 @@ Plugins are discovered from two places:
 
 Each module exposes ``PLUGIN`` (a Plugin) or ``PLUGINS`` (a list). The
 ``@plugin(name, description)`` decorator turns a ``def fn(ctx) -> str`` into one.
+
+**v2 -- disclosure & provenance (not a sandbox).** A module may declare
+``PERMISSIONS`` (a list of scope strings, e.g. ``["reads-processes",
+"network"]``) so the gallery can show what a plugin claims to do *before* you run
+it. User (file) plugins also carry a ``trust`` status from a hash trust-list:
+``untrusted`` until you trust it, then ``trusted`` while the file is unchanged
+and ``modified`` if it changes afterwards (tamper-evident). Built-ins are
+``built-in``. This is honest disclosure and change-detection -- Python can't
+truly sandbox a plugin, so an untrusted plugin is gated behind a confirm, not
+prevented from doing what its code does.
 """
 from __future__ import annotations
 
+import hashlib
 import importlib
 import importlib.util
+import json
+import os
 import pkgutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -28,6 +41,10 @@ from . import logbus
 from .settings import config_dir
 
 SRC = "core.plugins"
+
+# The scopes a plugin may declare in a module-level PERMISSIONS list.
+KNOWN_SCOPES = ("reads-processes", "reads-connections", "reads-registry",
+                "runs-powershell", "writes-registry", "network", "filesystem")
 
 
 @dataclass
@@ -60,6 +77,8 @@ class Plugin:
     run: Callable[[PluginContext], str] | None = None   # text tool (headless-safe)
     widget: Callable[[], object] | None = None          # GUI tool (returns a QWidget)
     source: str = ""
+    permissions: list[str] = field(default_factory=list)   # declared scopes
+    trust: str = "unknown"                                  # built-in/trusted/modified/untrusted
 
     @property
     def kind(self) -> str:
@@ -88,7 +107,9 @@ def user_dir() -> Path:
     return config_dir() / "plugins"
 
 
-def _extract(module, source: str) -> list[Plugin]:
+def _extract(module, source: str, trust: str) -> list[Plugin]:
+    perms = getattr(module, "PERMISSIONS", None)
+    perms = [str(s) for s in perms] if isinstance(perms, (list, tuple)) else []
     obj = getattr(module, "PLUGIN", None)
     if obj is None:
         obj = getattr(module, "PLUGINS", None)
@@ -97,8 +118,58 @@ def _extract(module, source: str) -> list[Plugin]:
     for p in items:
         if isinstance(p, Plugin) and (callable(p.run) or callable(p.widget)):
             p.source = source
+            p.trust = trust
+            if not p.permissions:          # module PERMISSIONS applies to its plugins
+                p.permissions = list(perms)
             out.append(p)
     return out
+
+
+# -- provenance / trust list (hash-based, tamper-evident) ------------------
+def _trust_path() -> Path:
+    return user_dir() / "trusted.json"
+
+
+def trusted_hashes() -> dict[str, str]:
+    try:
+        data = json.loads(_trust_path().read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _file_sha256(path: str) -> str:
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
+def trust_status(source: str) -> str:
+    """built-in | trusted | modified | untrusted for a plugin's source."""
+    if source.startswith("builtin:"):
+        return "built-in"
+    name = os.path.basename(source)
+    recorded = trusted_hashes().get(name)
+    if not recorded:
+        return "untrusted"
+    return "trusted" if recorded == _file_sha256(source) else "modified"
+
+
+def trust_file(path: str) -> bool:
+    """Record a user plugin's current hash so it verifies as 'trusted'."""
+    h = _file_sha256(path)
+    if not h:
+        return False
+    store = trusted_hashes()
+    store[os.path.basename(path)] = h
+    try:
+        _trust_path().parent.mkdir(parents=True, exist_ok=True)
+        _trust_path().write_text(json.dumps(store, indent=2), encoding="utf-8")
+        logbus.action(SRC, f"trusted plugin {os.path.basename(path)}")
+        return True
+    except OSError:
+        return False
 
 
 # Static fallback so built-ins still load in a frozen exe, where
@@ -120,7 +191,7 @@ def _discover_builtin() -> list[Plugin]:
     for name in names:
         try:
             mod = importlib.import_module(f"aetheris.plugins.{name}")
-            out += _extract(mod, f"builtin:{name}")
+            out += _extract(mod, f"builtin:{name}", "built-in")
         except Exception as exc:  # noqa: BLE001
             logbus.warn(SRC, f"failed to load builtin plugin {name}", str(exc))
     return out
@@ -142,7 +213,7 @@ def _discover_user(extra_dirs=None) -> list[Plugin]:
                     continue
                 mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)
-                out += _extract(mod, str(f))
+                out += _extract(mod, str(f), trust_status(str(f)))
             except Exception as exc:  # noqa: BLE001
                 logbus.warn(SRC, f"failed to load plugin {f.name}", str(exc))
     return out

@@ -1,6 +1,8 @@
 """Built-in GUI plugin: live CPU/RAM gauges (demonstrates widget plugins)."""
 from aetheris.core.plugins import widget_plugin
 
+PERMISSIONS = ["reads-processes"]
+
 
 def _make_widget():
     # Qt is imported lazily here so the headless CLI can discover this plugin

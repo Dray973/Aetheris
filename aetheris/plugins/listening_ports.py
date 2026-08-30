@@ -1,6 +1,8 @@
 """Built-in plugin: processes listening on TCP/UDP ports."""
 from aetheris.core.plugins import PluginContext, plugin
 
+PERMISSIONS = ["reads-connections"]
+
 
 @plugin("listening-ports", "List sockets in the LISTEN state and their owners")
 def run(ctx: PluginContext) -> str:

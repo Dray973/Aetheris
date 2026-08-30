@@ -15,6 +15,25 @@ def test_plugin_decorator_wraps_function():
     assert p.run(PluginContext()) == "hello"
 
 
+def test_builtin_plugins_declare_permissions_and_are_built_in():
+    ps = {p.name: p for p in plugins.discover()}
+    assert "reads-processes" in ps["top-memory"].permissions
+    assert "reads-connections" in ps["public-connections"].permissions
+    assert ps["top-memory"].trust == "built-in"
+
+
+def test_trust_lifecycle(tmp_path, monkeypatch):
+    monkeypatch.setattr(plugins, "user_dir", lambda: tmp_path)
+    f = tmp_path / "myplugin.py"
+    f.write_text("PLUGIN = None\n", encoding="utf-8")
+    assert plugins.trust_status(str(f)) == "untrusted"
+    assert plugins.trust_file(str(f)) is True
+    assert plugins.trust_status(str(f)) == "trusted"
+    f.write_text("PLUGIN = None\n# tampered\n", encoding="utf-8")
+    assert plugins.trust_status(str(f)) == "modified"     # hash no longer matches
+    assert plugins.trust_status("builtin:top_memory") == "built-in"
+
+
 def test_run_plugin_returns_text():
     ok, out = plugins.run_plugin("top-memory")
     assert ok and "Top processes by memory" in out

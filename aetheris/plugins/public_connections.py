@@ -1,6 +1,8 @@
 """Built-in plugin: active connections to public IP addresses."""
 from aetheris.core.plugins import PluginContext, plugin
 
+PERMISSIONS = ["reads-connections", "network"]
+
 
 @plugin("public-connections", "List established connections to public IPs (with geo)")
 def run(ctx: PluginContext) -> str:
