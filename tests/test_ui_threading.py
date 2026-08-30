@@ -98,3 +98,22 @@ def test_trim_working_sets_offloaded(qtbot, monkeypatch):
 
     _assert_offloaded(qtbot, tab, tab._trim_all, memory, "empty_all_working_sets",
                       monkeypatch, result=(3, 5))
+
+
+def test_service_control_offloaded(qtbot, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from aetheris.core import services
+    from aetheris.core.services import ServiceInfo
+    from aetheris.ui.tabs.shell_tab import ShellTab
+
+    tab = ShellTab()
+    qtbot.addWidget(tab)
+    tab._services = [ServiceInfo("Spooler", "Print Spooler", "", "", "auto", "service")]
+    tab._apply_svc_filter()
+    tab.svc_table.selectRow(0)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+
+    _assert_offloaded(qtbot, tab, lambda: tab._svc_control("start"), services,
+                      "start_service", monkeypatch, result=(True, "started"))
