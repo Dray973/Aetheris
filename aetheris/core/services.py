@@ -21,7 +21,7 @@ import sys
 from ctypes import wintypes
 from dataclasses import dataclass
 
-from . import logbus, signing
+from . import dryrun, logbus, safety, signing
 
 SRC = "core.services"
 
@@ -225,3 +225,75 @@ def _read_service_values(root_key, name: str):
 def unquoted_path_issues(services: list[ServiceInfo]) -> list[ServiceInfo]:
     """Filter a service list to those with the unquoted-service-path issue."""
     return [s for s in services if s.unquoted_path]
+
+
+# -- reversible control (dry-run + rollback + audit; UI adds the confirm) ---
+# sc.exe start-type tokens keyed by our labels.
+_SC_START = {"boot": "boot", "system": "system", "auto": "auto",
+             "manual": "demand", "disabled": "disabled"}
+
+
+def _sc(*args: str, timeout: int = 30) -> tuple[int, str]:
+    import subprocess
+    r = subprocess.run(["sc", *args], capture_output=True, text=True, timeout=timeout)
+    return r.returncode, (r.stdout or r.stderr).strip()
+
+
+def current_start_type(name: str) -> str:
+    """Read a service's configured start type from the registry (label)."""
+    if winreg is None:
+        return ""
+    try:
+        k = winreg.OpenKey(_HKLM, _SERVICES_KEY + "\\" + name)
+        try:
+            return start_type_label(int(winreg.QueryValueEx(k, "Start")[0]))
+        finally:
+            winreg.CloseKey(k)
+    except OSError:
+        return ""
+
+
+def start_service(name: str) -> tuple[bool, str]:
+    if dryrun.skip(SRC, f"start service {name}"):
+        return True, f"[dry-run] would start {name}"
+    rc, out = _sc("start", name)
+    ok = rc == 0 or "already" in out.lower()
+    if ok:
+        logbus.action(SRC, f"started service {name}")
+
+        def _undo() -> None:
+            _sc("stop", name)
+        safety.ledger.register(f"service {name} (started)", _undo)
+    return ok, out or f"(sc rc={rc})"
+
+
+def stop_service(name: str) -> tuple[bool, str]:
+    if dryrun.skip(SRC, f"stop service {name}"):
+        return True, f"[dry-run] would stop {name}"
+    rc, out = _sc("stop", name)
+    ok = rc == 0 or "not been started" in out.lower() or "not started" in out.lower()
+    if ok:
+        logbus.action(SRC, f"stopped service {name}")
+
+        def _undo() -> None:
+            _sc("start", name)
+        safety.ledger.register(f"service {name} (stopped)", _undo)
+    return ok, out or f"(sc rc={rc})"
+
+
+def set_start_type(name: str, new_label: str) -> tuple[bool, str]:
+    if new_label not in _SC_START:
+        return False, f"unknown start type {new_label!r}"
+    if dryrun.skip(SRC, f"set {name} start type -> {new_label}"):
+        return True, f"[dry-run] would set {name} start to {new_label}"
+    old = current_start_type(name)
+    rc, out = _sc("config", name, "start=", _SC_START[new_label])
+    ok = rc == 0
+    if ok:
+        logbus.action(SRC, f"set {name} start type to {new_label}")
+        if old in _SC_START:
+
+            def _undo(o: str = old) -> None:
+                _sc("config", name, "start=", _SC_START[o])
+            safety.ledger.register(f"service {name} (start={new_label})", _undo)
+    return ok, out or f"(sc rc={rc})"

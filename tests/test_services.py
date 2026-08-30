@@ -47,6 +47,55 @@ def test_unquoted_path_issues_filter():
     assert services.unquoted_path_issues([a, b]) == [a]
 
 
+# -- reversible control (deterministic; sc.exe monkeypatched) --------------
+def test_stop_service_registers_reverse_undo(monkeypatch):
+    from aetheris.core import safety
+    calls = []
+    monkeypatch.setattr(services, "_sc", lambda *a, **k: (calls.append(a), (0, "ok"))[1])
+    fresh = safety.RollbackLedger()
+    monkeypatch.setattr(safety, "ledger", fresh)
+
+    ok, _ = services.stop_service("Foo")
+    assert ok and calls[-1] == ("stop", "Foo")
+    assert fresh.pending() == ["service Foo (stopped)"]
+    fresh.panic()
+    assert calls[-1] == ("start", "Foo")           # undo restarted it
+
+
+def test_set_start_type_undo_restores_old(monkeypatch):
+    from aetheris.core import safety
+    calls = []
+    monkeypatch.setattr(services, "_sc", lambda *a, **k: (calls.append(a), (0, "ok"))[1])
+    monkeypatch.setattr(services, "current_start_type", lambda name: "auto")
+    fresh = safety.RollbackLedger()
+    monkeypatch.setattr(safety, "ledger", fresh)
+
+    ok, _ = services.set_start_type("Bar", "disabled")
+    assert ok and calls[-1] == ("config", "Bar", "start=", "disabled")
+    fresh.panic()
+    assert calls[-1] == ("config", "Bar", "start=", "auto")   # restored prior type
+
+
+def test_service_control_honors_dry_run(monkeypatch):
+    from aetheris.core import dryrun, safety
+    called = {"n": 0}
+    monkeypatch.setattr(services, "_sc",
+                        lambda *a, **k: (called.__setitem__("n", called["n"] + 1), (0, "ok"))[1])
+    fresh = safety.RollbackLedger()
+    monkeypatch.setattr(safety, "ledger", fresh)
+    with dryrun.active():
+        assert services.start_service("X")[0]
+        assert services.stop_service("X")[0]
+        assert services.set_start_type("X", "disabled")[0]
+    assert called["n"] == 0                         # sc never ran
+    assert fresh.pending() == []                    # nothing registered to undo
+
+
+def test_set_start_type_rejects_unknown():
+    ok, msg = services.set_start_type("X", "bogus")
+    assert not ok and "unknown" in msg.lower()
+
+
 # -- enumeration smoke (Windows) -------------------------------------------
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows SCM/registry")
 def test_enumerate_services_and_drivers_smoke():
