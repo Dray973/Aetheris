@@ -36,6 +36,7 @@ from .tabs.network_tab import NetworkTab
 from .tabs.plugins_tab import PluginsTab
 from .tabs.shell_tab import ShellTab
 from .tabs.storage_tab import StorageTab
+from .tabs.timeline_tab import TimelineTab
 from .theme import QSS
 
 
@@ -255,6 +256,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(NetworkTab(), "③  Network / Firewall")
         self.tabs.addTab(ShellTab(), "④  Shell Engineer / Registry")
         self.tabs.addTab(AutoShellTab(), "⑤  Auto-Shell (NL)")
+        self.tabs.addTab(TimelineTab(), "⑥  Timeline")
         self.tabs.addTab(PluginsTab(), "⚙  Plugins")
         self.setCentralWidget(self.tabs)
 

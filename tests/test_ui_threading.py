@@ -156,3 +156,13 @@ def test_persistence_control_offloaded(qtbot, monkeypatch):
 
     _assert_offloaded(qtbot, tab, lambda: tab._pm_control(False), persistence,
                       "set_enabled", monkeypatch, result=(True, "disabled"))
+
+
+def test_timeline_capture_offloaded(qtbot, monkeypatch):
+    from aetheris.core import timeline
+    from aetheris.ui.tabs.timeline_tab import TimelineTab
+
+    tab = TimelineTab()
+    qtbot.addWidget(tab)
+    _assert_offloaded(qtbot, tab, tab._capture, timeline, "capture",
+                      monkeypatch, result=timeline.Snapshot(seq=0, ts=0.0))
