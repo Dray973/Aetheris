@@ -89,6 +89,18 @@ def start_type_label(value: int) -> str:
     return _START_TYPES.get(value, "unknown")
 
 
+def normalize_start(text: str) -> str:
+    """Fold psutil's start-type strings into our vocabulary (auto/manual/...)."""
+    s = (text or "").lower()
+    if s.startswith("auto"):
+        return "auto"                          # "automatic", "automatic delayed"
+    if s in ("manual", "demand"):
+        return "manual"
+    if s == "disabled":
+        return "disabled"
+    return s or "unknown"
+
+
 def has_unquoted_path_vuln(image_path: str, kind: str) -> bool:
     """True if this is a win32 service whose ImagePath is unquoted and whose
     executable path contains a space -- the classic unquoted-service-path issue.
@@ -150,7 +162,7 @@ def enumerate_services(check_signature: bool = True) -> list[ServiceInfo]:
         rec = ServiceInfo(
             name=info.get("name", ""), display_name=info.get("display_name", ""),
             image_path=raw, binary=binary,
-            start_type=(info.get("start_type") or "unknown"),
+            start_type=normalize_start(info.get("start_type") or ""),
             kind="service", account=info.get("username") or "",
             state=(info.get("status") or "unknown"),
             unquoted_path=has_unquoted_path_vuln(raw, "service"))

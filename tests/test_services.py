@@ -31,6 +31,14 @@ def test_start_type_label():
     assert services.start_type_label(99) == "unknown"
 
 
+def test_normalize_start_folds_psutil_vocab():
+    assert services.normalize_start("Automatic") == "auto"
+    assert services.normalize_start("automatic delayed") == "auto"
+    assert services.normalize_start("Manual") == "manual"
+    assert services.normalize_start("Disabled") == "disabled"
+    assert services.normalize_start("") == "unknown"
+
+
 def test_unquoted_path_detector():
     assert services.has_unquoted_path_vuln(r"C:\Program Files\App\svc.exe", "service") is True
     assert services.has_unquoted_path_vuln(r'"C:\Program Files\App\svc.exe"', "service") is False
