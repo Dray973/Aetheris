@@ -137,3 +137,22 @@ def test_task_control_offloaded(qtbot, monkeypatch):
 
     _assert_offloaded(qtbot, tab, lambda: tab._task_control(False), taskaudit,
                       "disable_task", monkeypatch, result=(True, "disabled"))
+
+
+def test_persistence_control_offloaded(qtbot, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from aetheris.core import persistence
+    from aetheris.core.persistence import PersistenceEntry
+    from aetheris.ui.tabs.shell_tab import ShellTab
+
+    tab = ShellTab()
+    qtbot.addWidget(tab)
+    tab._pm = [PersistenceEntry("Service", "Spooler", "svc", "Service (auto)", ref="Spooler")]
+    tab._apply_pm_filter()
+    tab.pm_table.selectRow(0)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+
+    _assert_offloaded(qtbot, tab, lambda: tab._pm_control(False), persistence,
+                      "set_enabled", monkeypatch, result=(True, "disabled"))
