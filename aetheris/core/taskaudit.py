@@ -20,7 +20,7 @@ import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
-from . import logbus, signing
+from . import dryrun, logbus, safety, signing
 
 SRC = "core.taskaudit"
 
@@ -177,6 +177,43 @@ def enumerate_tasks(check_signature: bool = True) -> list[TaskInfo]:
 
 def suspicious_tasks(tasks: list[TaskInfo]) -> list[TaskInfo]:
     return [t for t in tasks if is_suspicious(t)]
+
+
+# -- reversible remediation (dry-run + rollback + audit; UI adds confirm) ---
+def _schtasks(*args: str, timeout: int = 30) -> tuple[int, str]:
+    import subprocess
+    r = subprocess.run(["schtasks", *args], capture_output=True, text=True, timeout=timeout)
+    return r.returncode, (r.stdout or r.stderr).strip()
+
+
+def disable_task(path: str) -> tuple[bool, str]:
+    """Disable a (suspicious) task; PANIC re-enables it."""
+    if dryrun.skip(SRC, f"disable task {path}"):
+        return True, f"[dry-run] would disable {path}"
+    rc, out = _schtasks("/change", "/tn", path, "/disable")
+    ok = rc == 0
+    if ok:
+        logbus.action(SRC, f"disabled task {path}")
+
+        def _undo() -> None:
+            _schtasks("/change", "/tn", path, "/enable")
+        safety.ledger.register(f"task {path} (disabled)", _undo)
+    return ok, out or f"(schtasks rc={rc})"
+
+
+def enable_task(path: str) -> tuple[bool, str]:
+    """Re-enable a task; PANIC disables it again."""
+    if dryrun.skip(SRC, f"enable task {path}"):
+        return True, f"[dry-run] would enable {path}"
+    rc, out = _schtasks("/change", "/tn", path, "/enable")
+    ok = rc == 0
+    if ok:
+        logbus.action(SRC, f"enabled task {path}")
+
+        def _undo() -> None:
+            _schtasks("/change", "/tn", path, "/disable")
+        safety.ledger.register(f"task {path} (enabled)", _undo)
+    return ok, out or f"(schtasks rc={rc})"
 
 
 def render_markdown(tasks: list[TaskInfo], only_suspicious: bool = True) -> str:

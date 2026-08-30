@@ -75,6 +75,33 @@ def test_render_markdown():
     assert "None flagged" in ta.render_markdown([])
 
 
+def test_disable_task_registers_reverse_undo(monkeypatch):
+    from aetheris.core import safety
+    calls = []
+    monkeypatch.setattr(ta, "_schtasks", lambda *a, **k: (calls.append(a), (0, "ok"))[1])
+    fresh = safety.RollbackLedger()
+    monkeypatch.setattr(safety, "ledger", fresh)
+
+    ok, _ = ta.disable_task(r"\Evil")
+    assert ok and calls[-1] == ("/change", "/tn", r"\Evil", "/disable")
+    assert fresh.pending() == [r"task \Evil (disabled)"]
+    fresh.panic()
+    assert calls[-1] == ("/change", "/tn", r"\Evil", "/enable")   # undo re-enabled it
+
+
+def test_task_remediation_honors_dry_run(monkeypatch):
+    from aetheris.core import dryrun, safety
+    called = {"n": 0}
+    monkeypatch.setattr(ta, "_schtasks",
+                        lambda *a, **k: (called.__setitem__("n", called["n"] + 1), (0, "ok"))[1])
+    fresh = safety.RollbackLedger()
+    monkeypatch.setattr(safety, "ledger", fresh)
+    with dryrun.active():
+        assert ta.disable_task(r"\X")[0]
+        assert ta.enable_task(r"\X")[0]
+    assert called["n"] == 0 and fresh.pending() == []
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows Task Scheduler")
 def test_enumerate_tasks_smoke():
     tasks = ta.enumerate_tasks()
