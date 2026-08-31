@@ -120,8 +120,11 @@ def take_ownership(path: str) -> tuple[bool, str]:
         return False, "refused: path is inside a protected OS root"
     try:
         r1 = subprocess.run(["takeown", "/F", path], capture_output=True, text=True, timeout=30)
+        # Grant to the *SID* of the built-in Administrators group (S-1-5-32-544),
+        # not the literal name "administrators" -- the name is localized and the
+        # grant fails on non-English Windows.
         r2 = subprocess.run(
-            ["icacls", path, "/grant", "administrators:F"],
+            ["icacls", path, "/grant", "*S-1-5-32-544:F"],
             capture_output=True, text=True, timeout=30,
         )
         ok = r1.returncode == 0 and r2.returncode == 0
