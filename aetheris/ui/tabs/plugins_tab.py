@@ -8,13 +8,14 @@ headlessly via ``aetheris-cli run <name>``.
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QSplitter,
@@ -22,6 +23,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+_TRUST_COLORS = {"untrusted": "#e0b341", "modified": "#ff5d6c"}
 
 from ...core import logbus, plugins
 from ..workers import Worker
@@ -75,6 +78,11 @@ class PluginsTab(QWidget):
         reload = QPushButton("Reload")
         reload.clicked.connect(self.reload)
         bar.addWidget(reload)
+        trust_b = QPushButton("Trust plugin")
+        trust_b.setToolTip("Record this user plugin's hash so it verifies as "
+                           "trusted until the file changes.")
+        trust_b.clicked.connect(self._trust)
+        bar.addWidget(trust_b)
         export = QPushButton("Export output…")
         export.clicked.connect(self._export)
         bar.addWidget(export)
@@ -87,8 +95,15 @@ class PluginsTab(QWidget):
         self._plugins = plugins.discover()
         self.list.clear()
         for p in self._plugins:
-            self.list.addItem(QListWidgetItem(p.name))
-        self.count_lbl.setText(f"{len(self._plugins)} plugin(s)")
+            item = QListWidgetItem(f"{p.name}   [{p.trust}]")
+            colour = _TRUST_COLORS.get(p.trust)
+            if colour:
+                item.setForeground(QColor(colour))
+            self.list.addItem(item)
+        n_unv = sum(1 for p in self._plugins if p.trust in ("untrusted", "modified"))
+        self.count_lbl.setText(
+            f"{len(self._plugins)} plugin(s)"
+            + (f"  ·  {n_unv} untrusted" if n_unv else ""))
         logbus.trace("ui.plugins", f"listed {len(self._plugins)} plugins")
 
     def _selected(self) -> plugins.Plugin | None:
@@ -99,8 +114,13 @@ class PluginsTab(QWidget):
 
     def _on_select(self) -> None:
         p = self._selected()
-        kind = f"  ·  {p.kind} plugin" if p else ""
-        self.desc.setText(f"{p.name} — {p.description}{kind}   [{p.source}]" if p else "")
+        if p is None:
+            self.desc.setText("")
+            return
+        perms = ", ".join(p.permissions) if p.permissions else "none declared"
+        self.desc.setText(
+            f"{p.name} — {p.description}\n"
+            f"{p.kind} plugin · trust: {p.trust} · declared scope: {perms}   [{p.source}]")
 
     def _clear_host(self) -> None:
         while self._host_layout.count():
@@ -109,9 +129,35 @@ class PluginsTab(QWidget):
             if w is not None:
                 w.deleteLater()
 
+    def _trust(self) -> None:
+        p = self._selected()
+        if p is None:
+            return
+        if p.trust == "built-in" or p.source.startswith("builtin:"):
+            logbus.trace("ui.plugins", "built-in plugins are already trusted")
+            return
+        if plugins.trust_file(p.source):
+            logbus.success("ui.plugins", f"trusted plugin: {p.name}")
+            self.reload()
+        else:
+            logbus.error("ui.plugins", f"could not trust {p.name}")
+
+    def _confirm_untrusted(self, p) -> bool:
+        perms = ", ".join(p.permissions) if p.permissions else "none declared"
+        note = ("This plugin's file has CHANGED since you trusted it."
+                if p.trust == "modified" else "This plugin is not trusted.")
+        return QMessageBox.warning(
+            self, "Run untrusted plugin",
+            f"{note}\n\nPlugin: {p.name}\nDeclared scope: {perms}\nSource: {p.source}\n\n"
+            "Plugins run with the app's privileges and are NOT sandboxed. Run it?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        ) == QMessageBox.StandardButton.Yes
+
     def _run(self) -> None:
         p = self._selected()
         if p is None:
+            return
+        if p.trust in ("untrusted", "modified") and not self._confirm_untrusted(p):
             return
         if p.kind == "widget":
             # GUI plugin: build and embed its widget (runs on the UI thread).

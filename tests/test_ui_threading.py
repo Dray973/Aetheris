@@ -166,3 +166,23 @@ def test_timeline_capture_offloaded(qtbot, monkeypatch):
     qtbot.addWidget(tab)
     _assert_offloaded(qtbot, tab, tab._capture, timeline, "capture",
                       monkeypatch, result=timeline.Snapshot(seq=0, ts=0.0))
+
+
+def test_untrusted_plugin_run_is_gated(qtbot, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from aetheris.core.plugins import Plugin
+    from aetheris.ui.tabs.plugins_tab import PluginsTab
+
+    tab = PluginsTab()
+    qtbot.addWidget(tab)
+    tab._plugins = [Plugin(name="evil", description="d", run=lambda ctx: "x",
+                           source="C:/x/evil.py", trust="untrusted",
+                           permissions=["writes-registry"])]
+    tab.list.clear()
+    tab.list.addItem("evil")
+    tab.list.setCurrentRow(0)
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: QMessageBox.StandardButton.No)   # decline
+    tab._run()
+    assert tab._worker is None or not tab._worker.isRunning()   # never started
