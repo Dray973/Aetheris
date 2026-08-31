@@ -81,6 +81,18 @@ class TOKEN_PRIVILEGES(ctypes.Structure):
     ]
 
 
+# --- Shared function signatures --------------------------------------------
+# Bound here (not per-consumer) so a 64-bit HANDLE returned by OpenProcess /
+# GetCurrentProcess is never truncated to a 32-bit int -- a real x64 correctness
+# hazard if a module that calls these imports before one that set the restype.
+if IS_WINDOWS:
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+
+
 def last_error_str() -> str:
     """Human-readable string for the last Win32 error on this thread."""
     if not IS_WINDOWS:
