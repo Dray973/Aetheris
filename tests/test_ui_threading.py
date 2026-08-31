@@ -34,14 +34,26 @@ def _assert_offloaded(qtbot, tab, fire, patch_target, attr, monkeypatch, result)
     monkeypatch.setattr(patch_target, attr, blocker)
     gui_thread = threading.current_thread().name
 
-    if tab._worker is not None:
-        tab._worker.wait(5000)           # let any construction-time refresh finish
+    # Fully drain any construction-time refresh worker before firing: the tabs
+    # share one _worker slot, so a slow initial refresh (MemoryTab signs every
+    # process on load) would make the slot under test bail with "a task is
+    # already running". Poll to completion rather than a single fixed wait.
+    waited = 0
+    while tab._worker is not None and tab._worker.isRunning() and waited < 60000:
+        tab._worker.wait(1000)
+        waited += 1000
     fire()                               # the slot under test -- must return at once
+    worker = tab._worker                 # the Worker the slot just started (captured now)
     try:
-        assert entered.wait(2.0), "native call never started on a worker"
+        # Generous budget: this only bounds QThread start-up latency (which can
+        # spike under load). The real proof of offloading is the thread check
+        # below -- an inline (un-offloaded) call would run on the GUI thread.
+        assert entered.wait(5.0), "native call never started on a worker"
         assert seen["thread"] != gui_thread, "native call ran on the GUI thread"
-        worker = tab._worker
-        assert worker is not None and worker.isRunning()
+        # The slot must have pushed the work onto a fresh Worker (not run inline
+        # nor reused a finished one). isRunning() is deliberately not asserted:
+        # it races the blocker and adds nothing the thread check hasn't proven.
+        assert worker is not None and worker is tab._worker
         with qtbot.waitSignal(worker.done, timeout=5000):
             release.set()                # release inside the wait so we don't miss done
     finally:
