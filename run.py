@@ -23,6 +23,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def main() -> int:
+    # Headless CLI dispatch: "AetherisQuantumCore.exe cli <args>" (or
+    # "python run.py cli <args>") runs the forensic capture CLI instead of the
+    # GUI. This is what lets the *frozen exe* back a scheduled capture task.
+    argv = sys.argv[1:]
+    if argv and argv[0] == "cli":
+        from aetheris.cli import main as cli_main
+        return cli_main(argv[1:])
+
     no_elevate = "--no-elevate" in sys.argv
 
     # Only meaningful on Windows; the app still imports/tests on other OSes.

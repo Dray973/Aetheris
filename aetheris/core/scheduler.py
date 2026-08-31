@@ -25,6 +25,9 @@ def _pythonw() -> str:
 
 def capture_command(out_file: str, fmt: str = "html") -> str:
     """The command a scheduled task runs (a single schtasks /TR string)."""
+    if getattr(sys, "frozen", False):
+        # Frozen exe: it dispatches "cli <args>" to the headless CLI (see run.py).
+        return f'"{sys.executable}" cli --format {fmt} --out "{out_file}" report'
     return (f'"{_pythonw()}" -m aetheris.cli --format {fmt} '
             f'--out "{out_file}" report')
 
