@@ -1,8 +1,8 @@
 """
 Aetheris main window.
 
-Assembles the five module workspaces as tabs, docks the live audit console at
-the bottom, and wires the master PANIC control (toolbar button + Ctrl+Shift+Esc
+Assembles the module workspaces as tabs, docks the live audit console at the
+bottom, and wires the master PANIC control (toolbar button + Ctrl+Shift+Esc
 hotkey) to the Omega Rollback ledger.
 """
 from __future__ import annotations
