@@ -46,7 +46,7 @@ DEFAULTS: dict[str, Any] = {
 
 
 class Settings:
-    def __init__(self, path: str | os.PathLike | None = None) -> None:
+    def __init__(self, path: str | os.PathLike[str] | None = None) -> None:
         self.path = Path(path) if path else (config_dir() / "settings.json")
         self._data: dict[str, Any] = dict(DEFAULTS)
         self._lock = threading.Lock()

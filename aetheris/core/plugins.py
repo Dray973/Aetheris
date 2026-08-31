@@ -36,6 +36,7 @@ import pkgutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from . import logbus
 from .settings import config_dir
@@ -50,23 +51,23 @@ KNOWN_SCOPES = ("reads-processes", "reads-connections", "reads-registry",
 @dataclass
 class PluginContext:
     """Services a plugin may use. Cheap to construct; snapshots are on demand."""
-    args: dict = field(default_factory=dict)
+    args: dict[str, Any] = field(default_factory=dict)
 
-    def processes(self):
+    def processes(self) -> list[Any]:
         from ..forensics import processes
         return processes.snapshot()
 
-    def connections(self, resolve_geo: bool = True):
+    def connections(self, resolve_geo: bool = True) -> list[Any]:
         from ..network import connections
         return connections.snapshot(resolve_geo=resolve_geo)
 
     @property
-    def report(self):
+    def report(self) -> Any:
         from . import report
         return report
 
     @property
-    def log(self):
+    def log(self) -> Any:
         return logbus
 
 
@@ -85,14 +86,14 @@ class Plugin:
         return "widget" if self.widget else "text"
 
 
-def plugin(name: str, description: str = "") -> Callable[[Callable], Plugin]:
+def plugin(name: str, description: str = "") -> Callable[[Callable[..., Any]], Plugin]:
     """Decorator: wrap ``def fn(ctx) -> str`` as a text Plugin."""
     def deco(fn: Callable[[PluginContext], str]) -> Plugin:
         return Plugin(name=name, description=description, run=fn)
     return deco
 
 
-def widget_plugin(name: str, description: str = "") -> Callable[[Callable], Plugin]:
+def widget_plugin(name: str, description: str = "") -> Callable[[Callable[..., Any]], Plugin]:
     """
     Decorator: wrap ``def factory() -> QWidget`` as a GUI Plugin. Import PyQt6
     *inside* the factory (lazily) so the headless CLI can still discover the
@@ -107,7 +108,7 @@ def user_dir() -> Path:
     return config_dir() / "plugins"
 
 
-def _extract(module, source: str, trust: str) -> list[Plugin]:
+def _extract(module: Any, source: str, trust: str) -> list[Plugin]:
     perms = getattr(module, "PERMISSIONS", None)
     perms = [str(s) for s in perms] if isinstance(perms, (list, tuple)) else []
     obj = getattr(module, "PLUGIN", None)
@@ -197,7 +198,7 @@ def _discover_builtin() -> list[Plugin]:
     return out
 
 
-def _discover_user(extra_dirs=None) -> list[Plugin]:
+def _discover_user(extra_dirs: list[str] | None = None) -> list[Plugin]:
     out: list[Plugin] = []
     dirs = [user_dir()] + [Path(d) for d in (extra_dirs or [])]
     for d in dirs:
@@ -219,7 +220,7 @@ def _discover_user(extra_dirs=None) -> list[Plugin]:
     return out
 
 
-def discover(extra_dirs=None) -> list[Plugin]:
+def discover(extra_dirs: list[str] | None = None) -> list[Plugin]:
     """Return all plugins (built-in first, then user; first name wins)."""
     plugins: list[Plugin] = []
     seen: set[str] = set()

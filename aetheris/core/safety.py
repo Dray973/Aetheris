@@ -91,7 +91,7 @@ def create_restore_point(description: str = "Aetheris Quantum Core session") -> 
 
     # Preferred: WMI SystemRestore provider via win32com.
     try:
-        import win32com.client  # type: ignore
+        import win32com.client
 
         locator = win32com.client.Dispatch("WbemScripting.SWbemLocator")
         svc = locator.ConnectServer(".", r"root\default")

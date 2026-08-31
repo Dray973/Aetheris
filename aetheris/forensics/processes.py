@@ -17,6 +17,7 @@ import ctypes
 from collections.abc import Iterator
 from ctypes import wintypes
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import psutil
 
@@ -40,7 +41,7 @@ class ProcessInfo:
     aslr: str = "unknown"     # on / off / unknown
     signature: str = "unchecked"
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 

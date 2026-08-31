@@ -27,6 +27,7 @@ import sys
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .. import __version__ as CURRENT_VERSION
 from . import logbus
@@ -36,7 +37,7 @@ from .settings import DEFAULTS, config_dir, settings
 def effective_update_url() -> str:
     """The configured update source, falling back to the baked-in default when a
     stored value is blank (e.g. saved empty by an older build)."""
-    return settings().get("update_url", "") or DEFAULTS.get("update_url", "")
+    return str(settings().get("update_url", "") or DEFAULTS.get("update_url", ""))
 
 SRC = "core.updater"
 DETACHED_PROCESS = 0x00000008
@@ -80,13 +81,14 @@ def staging_path() -> Path:
 GITHUB_PREFIX = "github:"
 
 
-def _fetch_json(url: str, headers: dict | None = None) -> dict:
+def _fetch_json(url: str, headers: dict[str, str] | None = None) -> dict[str, Any]:
     req = urllib.request.Request(url, headers=headers or {})
     with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        data: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
+        return data
 
 
-def fetch_manifest(url: str) -> dict:
+def fetch_manifest(url: str) -> dict[str, Any]:
     return _fetch_json(url)
 
 

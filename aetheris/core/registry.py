@@ -126,9 +126,10 @@ class RegDiff:
         return out
 
 
-def diff_trees(before: dict[str, dict], after: dict[str, dict]) -> RegDiff:
+def diff_trees(before: dict[str, dict[str, Any]],
+               after: dict[str, dict[str, Any]]) -> RegDiff:
     """Flatten both snapshots to key\\value granularity and diff."""
-    def flatten(tree: dict[str, dict]) -> dict[str, Any]:
+    def flatten(tree: dict[str, dict[str, Any]]) -> dict[str, Any]:
         flat: dict[str, Any] = {}
         for key, values in tree.items():
             for vname, vdata in values.items():
@@ -146,7 +147,7 @@ def diff_trees(before: dict[str, dict], after: dict[str, dict]) -> RegDiff:
     return RegDiff(added, modified, removed)
 
 
-def save_snapshot(tree: dict, path: str) -> tuple[bool, str]:
+def save_snapshot(tree: dict[str, Any], path: str) -> tuple[bool, str]:
     """Persist a snapshot_tree() result to a JSON file for offline diffing."""
     import json
     try:
@@ -158,11 +159,12 @@ def save_snapshot(tree: dict, path: str) -> tuple[bool, str]:
         return False, str(exc)
 
 
-def load_snapshot(path: str) -> dict:
+def load_snapshot(path: str) -> dict[str, Any]:
     """Load a snapshot previously written by save_snapshot()."""
     import json
     with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+        data: dict[str, Any] = json.load(fh)
+        return data
 
 
 # --------------------------------------------------------------------------
@@ -187,7 +189,8 @@ def history_dir() -> Path:
     return config_dir() / "snapshots"
 
 
-def save_to_history(root: str, subkey: str, tree: dict, label: str = "") -> HistoryEntry:
+def save_to_history(root: str, subkey: str, tree: dict[str, Any],
+                    label: str = "") -> HistoryEntry:
     """Write a timestamped snapshot into the managed history store."""
     import json
     import re
@@ -224,17 +227,18 @@ def list_history() -> list[HistoryEntry]:
     return out
 
 
-def load_history(path: str) -> dict:
+def load_history(path: str) -> dict[str, Any]:
     """Return the snapshot tree from a history entry file."""
     import json
     with open(path, encoding="utf-8") as fh:
-        return json.load(fh).get("tree", {})
+        tree: dict[str, Any] = json.load(fh).get("tree", {})
+        return tree
 
 
 # --------------------------------------------------------------------------
 # Reversible value writes + privacy toggles
 # --------------------------------------------------------------------------
-def _read_value(root: str, subkey: str, name: str):
+def _read_value(root: str, subkey: str, name: str) -> Any:
     hive = _HIVES[root.upper()]
     try:
         key = winreg.OpenKey(hive, subkey, 0, winreg.KEY_READ)
@@ -246,7 +250,8 @@ def _read_value(root: str, subkey: str, name: str):
         return None
 
 
-def set_value(root: str, subkey: str, name: str, data, vtype=None) -> tuple[bool, str]:
+def set_value(root: str, subkey: str, name: str, data: Any,
+              vtype: int | None = None) -> tuple[bool, str]:
     """Set a value, recording the prior state for rollback."""
     if winreg is None:
         return False, "Windows only"
@@ -264,7 +269,8 @@ def set_value(root: str, subkey: str, name: str, data, vtype=None) -> tuple[bool
     except OSError as exc:
         return False, str(exc)
 
-    def undo(prior=prior, root=root, subkey=subkey, name=name):
+    def undo(prior: Any = prior, root: str = root, subkey: str = subkey,
+             name: str = name) -> None:
         if prior is None:
             try:
                 key = winreg.OpenKey(_HIVES[root.upper()], subkey, 0, winreg.KEY_SET_VALUE)
@@ -364,7 +370,7 @@ def add_context_command(label: str, command: str,
         winreg.CloseKey(k)
         logbus.action(SRC, fr"added context command HKCR\{base}", command)
 
-        def undo(base=base):
+        def undo(base: str = base) -> None:
             try:
                 winreg.DeleteKey(winreg.HKEY_CLASSES_ROOT, base + r"\command")
                 winreg.DeleteKey(winreg.HKEY_CLASSES_ROOT, base)
@@ -427,7 +433,7 @@ def _sanitize(name: str) -> str:
     return "".join(c for c in name if c.isalnum() or c in "._-") or "Menu"
 
 
-def _delete_tree(hive, path: str) -> None:
+def _delete_tree(hive: Any, path: str) -> None:
     """Recursively delete a registry key and all its subkeys."""
     try:
         k = winreg.OpenKey(hive, path, 0, winreg.KEY_ALL_ACCESS)
@@ -493,7 +499,7 @@ def add_cascading_menu(top_label: str, items: list[MenuItem],
     except OSError as exc:
         return False, str(exc)
 
-    def undo(top_sub=top_sub, roots=list(store_roots)):
+    def undo(top_sub: str = top_sub, roots: list[str] = list(store_roots)) -> None:
         _delete_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\\" + top_sub)
         for r in roots:
             _delete_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\\" + r)

@@ -24,6 +24,7 @@ from __future__ import annotations
 import struct
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
 
 from ..core import logbus
 
@@ -182,7 +183,7 @@ def _parse_run_list(buf: bytes | bytearray, pos: int, cluster_size: int) -> list
     return extents
 
 
-def _mft_extents(fh, boot: BootInfo) -> list[tuple[int, int]]:
+def _mft_extents(fh: Any, boot: BootInfo) -> list[tuple[int, int]]:
     """Read $MFT record 0 and return the physical extents of its $DATA stream."""
     fh.seek(boot.mft_offset)
     buf = bytearray(fh.read(boot.record_size))

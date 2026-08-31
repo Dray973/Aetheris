@@ -79,7 +79,7 @@ class GeoIPResolver:
 
     def _init(self) -> None:
         try:
-            import geoip2.database  # type: ignore
+            import geoip2.database
         except Exception:
             self.status = "geoip2 not installed (pip install geoip2)"
             logbus.trace(SRC, self.status)

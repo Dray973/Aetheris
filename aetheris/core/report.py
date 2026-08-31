@@ -36,7 +36,7 @@ def rows_to_csv(headers: Sequence[str], rows: Iterable[Sequence[Any]]) -> str:
     return buf.getvalue()
 
 
-def rows_to_json(rows: Iterable[dict]) -> str:
+def rows_to_json(rows: Iterable[dict[str, Any]]) -> str:
     return json.dumps(list(rows), indent=2, default=str)
 
 
@@ -48,7 +48,7 @@ def escape_html(s: Any) -> str:
 # --------------------------------------------------------------------------
 # Domain row builders
 # --------------------------------------------------------------------------
-def process_rows(procs: Iterable) -> list[dict]:
+def process_rows(procs: Iterable[Any]) -> list[dict[str, Any]]:
     out = []
     for p in procs:
         out.append({
@@ -60,7 +60,7 @@ def process_rows(procs: Iterable) -> list[dict]:
     return out
 
 
-def connection_rows(conns: Iterable) -> list[dict]:
+def connection_rows(conns: Iterable[Any]) -> list[dict[str, Any]]:
     out = []
     for c in conns:
         out.append({
@@ -145,7 +145,7 @@ def html_document(title: str, sections: list[tuple[str, str, Any]]) -> str:
     return "\n".join(parts)
 
 
-def session_html(procs: Iterable, conns: Iterable) -> str:
+def session_html(procs: Iterable[Any], conns: Iterable[Any]) -> str:
     """Full session report as a self-contained HTML document."""
     top = sorted(process_rows(procs), key=lambda r: r["mem_rss"], reverse=True)[:30]
     crows = [c for c in connection_rows(conns) if c["remote"]]
@@ -162,7 +162,7 @@ def session_html(procs: Iterable, conns: Iterable) -> str:
     ])
 
 
-def session_markdown(procs: Iterable, conns: Iterable, extra: str = "") -> str:
+def session_markdown(procs: Iterable[Any], conns: Iterable[Any], extra: str = "") -> str:
     info = system_summary()
     lines = [f"# {APP} — Session Report", ""]
     for k, v in info.items():

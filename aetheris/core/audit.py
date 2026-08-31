@@ -19,7 +19,7 @@ import os
 import threading
 import time
 from dataclasses import asdict, dataclass
-from typing import TextIO
+from typing import Any, TextIO
 
 GENESIS_HASH = "0" * 64
 SRC = "core.audit"
@@ -71,7 +71,7 @@ class AuditLog:
                 self._persist(rec)
             return rec
 
-    def append_event(self, event) -> AuditRecord:
+    def append_event(self, event: Any) -> AuditRecord:
         """Adapter for a ``logbus.LogEvent`` (used by :func:`wire_to_logbus`)."""
         level = getattr(event.level, "value", str(event.level))
         return self.append(level, event.source, event.message,

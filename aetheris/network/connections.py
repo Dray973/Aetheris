@@ -21,6 +21,7 @@ import ipaddress
 import socket
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import psutil
 
@@ -119,7 +120,7 @@ class BandwidthSampler:
         return up, down
 
 
-def per_process_bandwidth_sampler():
+def per_process_bandwidth_sampler() -> Any:
     """
     Build a per-process bandwidth sampler exposing ``.available``, ``.status`` and
     ``.sample() -> {pid: (up_Bps, down_Bps)}``.

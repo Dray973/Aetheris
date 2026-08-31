@@ -20,6 +20,7 @@ import re
 import sys
 from ctypes import wintypes
 from dataclasses import dataclass
+from typing import Any
 
 from . import dryrun, logbus, safety, signing
 
@@ -212,14 +213,15 @@ def enumerate_drivers(check_signature: bool = True) -> list[ServiceInfo]:
     return out
 
 
-def _read_service_values(root_key, name: str):
+def _read_service_values(root_key: Any,
+                         name: str) -> tuple[int, int, str, str, str] | None:
     """Return (Type, Start, ImagePath, DisplayName, ObjectName) or None."""
     try:
         k = winreg.OpenKey(root_key, name)
     except OSError:
         return None
     try:
-        def _val(n, default):
+        def _val(n: str, default: Any) -> Any:
             try:
                 return winreg.QueryValueEx(k, n)[0]
             except OSError:

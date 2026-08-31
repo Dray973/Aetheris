@@ -52,11 +52,11 @@ class TaskInfo:
 
 
 # -- pure XML parsing (no OS dependency) -----------------------------------
-def _lname(elem) -> str:
+def _lname(elem: ET.Element) -> str:
     return elem.tag.rsplit("}", 1)[-1] if isinstance(elem.tag, str) else ""
 
 
-def _child(parent, name: str):
+def _child(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
     for c in parent:
@@ -65,7 +65,7 @@ def _child(parent, name: str):
     return None
 
 
-def _text(parent, name: str, default: str = "") -> str:
+def _text(parent: ET.Element | None, name: str, default: str = "") -> str:
     c = _child(parent, name)
     return (c.text or default).strip() if c is not None and c.text is not None else default
 

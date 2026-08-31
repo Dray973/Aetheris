@@ -18,6 +18,7 @@ import threading
 import time
 import traceback
 from pathlib import Path
+from types import TracebackType
 
 from . import logbus
 from .settings import config_dir
@@ -41,7 +42,8 @@ def _scrub(text: str) -> str:
     return text
 
 
-def write_report(exc_type, exc_value, exc_tb) -> str | None:
+def write_report(exc_type: type[BaseException], exc_value: BaseException,
+                 exc_tb: TracebackType | None) -> str | None:
     """Write a scrubbed crash report; return its path (or None on failure)."""
     try:
         from .. import __version__
@@ -78,7 +80,8 @@ def install() -> None:
         return
     _prev_hook = sys.excepthook
 
-    def _hook(exc_type, exc_value, exc_tb):
+    def _hook(exc_type: type[BaseException], exc_value: BaseException,
+              exc_tb: TracebackType | None) -> None:
         if not issubclass(exc_type, KeyboardInterrupt):
             path = write_report(exc_type, exc_value, exc_tb)
             msg = f"unhandled {exc_type.__name__}: crash report written to {path}"
@@ -90,8 +93,8 @@ def install() -> None:
         if _prev_hook is not None:
             _prev_hook(exc_type, exc_value, exc_tb)
 
-    def _thread_hook(args):
-        if not issubclass(args.exc_type, KeyboardInterrupt):
+    def _thread_hook(args: threading.ExceptHookArgs) -> None:
+        if args.exc_value is not None and not issubclass(args.exc_type, KeyboardInterrupt):
             write_report(args.exc_type, args.exc_value, args.exc_traceback)
 
     sys.excepthook = _hook

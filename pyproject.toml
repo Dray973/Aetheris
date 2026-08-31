@@ -89,25 +89,31 @@ ignore = [
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true
+# The pure-logic layers are held to --strict; the native (ctypes/COM) and Qt
+# layers are relaxed below because their types live in the runtime, not the
+# stubs. This is scoped honestly per module, not a blanket ignore.
+strict = true
 
 [[tool.mypy.overrides]]
-# The PyQt6 UI layer is not statically checked: PyQt6's type stubs emit false
-# overload / signal-typing errors (QLabel(objectName=...), QByteArray, nullable
+# The PyQt6 UI layer + the one Qt-based plugin: PyQt6's stubs emit false overload
+# / signal-typing errors (QLabel(objectName=...), QByteArray, nullable
 # QTableWidgetItem) that don't reflect real bugs.
-module = ["aetheris.ui.*"]
+module = ["aetheris.ui.*", "aetheris.plugins.system_gauges"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-# These modules bind Windows DLL handles dynamically via ctypes at runtime
-# (attributes attached to WinDLL objects; `WinDLL | None` across the IS_WINDOWS
-# guard), which static analysis can't model. They are covered by the Windows
+# Native binding modules: they attach DLL handles/attributes to WinDLL objects
+# dynamically, carry `WinDLL | None` across the IS_WINDOWS guard, and speak COM
+# via comtypes -- shapes static analysis can't model. Covered by the Windows
 # test suite instead.
 module = ["aetheris.core.winapi", "aetheris.core.signing",
-          "aetheris.network.procbw", "aetheris.network.etwbw"]
+          "aetheris.network.procbw", "aetheris.network.etwbw",
+          "aetheris.network.firewall", "aetheris.storage.handles",
+          "aetheris.forensics.disasm", "aetheris.forensics.memvirt"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
 # mypy can't infer the type of a default-argument lambda used to capture a
-# closure variable (the deliberate rollback-undo idiom in these modules).
-module = ["aetheris.core.autoruns", "aetheris.network.firewall"]
+# closure variable (the deliberate rollback-undo idiom here).
+module = ["aetheris.core.autoruns"]
 disable_error_code = ["misc"]
