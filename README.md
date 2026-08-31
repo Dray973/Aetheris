@@ -283,3 +283,8 @@ python -c "import aetheris.core.nlshell_smoke" 2>$null   # see tools below
 
 Non-Windows machines can import and unit-test the pure-Python layers (nlshell,
 dedupe, registry diff logic); Win32-specific calls guard on `sys.platform`.
+
+## Contributors
+
+- **[Dray973](https://github.com/Dray973)** — author & maintainer
+- **Claude** (Anthropic) — pair-programming on features, code review, and fixes
