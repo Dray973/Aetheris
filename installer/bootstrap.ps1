@@ -23,14 +23,14 @@ function Write-Ok($msg)   { Write-Host "  + $msg" -ForegroundColor Green }
 # --- 1. Locate or install Python 3.10+ ------------------------------------
 function Test-PyVersion($exe, $prefix) {
     # Run the candidate; return $true only if it is a working Python >= 3.10.
+    # The probe prints major*100+minor (e.g. 312) and uses NO quotes or format
+    # strings: Windows PowerShell 5.1 mangles embedded double-quotes when calling
+    # a native exe, which silently broke the old 'import sys;print("%d.%d"%...)'.
     try {
-        $ver = & $exe @($prefix + @('-c',
-            'import sys;print("%d.%d"%sys.version_info[:2])')) 2>$null
-        if ($LASTEXITCODE -eq 0 -and $ver) {
-            $p = $ver.Trim().Split('.')
-            if (([int]$p[0] -gt 3) -or ([int]$p[0] -eq 3 -and [int]$p[1] -ge 10)) {
-                return $true
-            }
+        $out = & $exe @($prefix + @('-c',
+            'import sys;print(sys.version_info[0]*100+sys.version_info[1])')) 2>$null
+        if ($LASTEXITCODE -eq 0 -and $out -and ([int]($out.Trim()) -ge 310)) {
+            return $true
         }
     } catch { }
     return $false
