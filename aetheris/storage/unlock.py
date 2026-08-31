@@ -30,9 +30,22 @@ from . import handles
 
 SRC = "storage.unlock"
 
-PROTECTED_ROOTS = (
-    os.environ.get("SystemRoot", r"C:\Windows").lower(),
-)
+def _protected_roots() -> tuple[str, ...]:
+    """Core OS/app locations the obliterator refuses, lowercased + de-duped."""
+    raw = [os.environ.get("SystemRoot", r"C:\Windows")]
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramData"):
+        val = os.environ.get(var)
+        if val:
+            raw.append(val)
+    roots = []
+    for r in raw:
+        low = os.path.abspath(r).lower().rstrip("\\/")
+        if low and low not in roots:
+            roots.append(low)
+    return tuple(roots)
+
+
+PROTECTED_ROOTS = _protected_roots()
 CRITICAL_PROCESSES = {
     "system", "system idle process", "registry", "smss.exe", "csrss.exe",
     "wininit.exe", "winlogon.exe", "services.exe", "lsass.exe", "lsaiso.exe",
@@ -48,8 +61,13 @@ class Locker:
 
 
 def is_protected_path(path: str) -> bool:
-    low = os.path.abspath(path).lower()
-    return any(low.startswith(root) for root in PROTECTED_ROOTS)
+    """True if *path* is a protected root or lives inside one. Matches on a path
+    separator boundary so C:\\Windows does not also match C:\\WindowsApps."""
+    low = os.path.abspath(path).lower().rstrip("\\/")
+    for root in PROTECTED_ROOTS:
+        if low == root or low.startswith(root + os.sep):
+            return True
+    return False
 
 
 def find_lockers(target: str) -> list[Locker]:
