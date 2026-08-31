@@ -60,6 +60,7 @@ class Capabilities:
     physical: bool = False
     hidden_detection: bool = False
     page_tables: bool = False
+    physical_write: bool = False   # DMA write-back (PCILeech FPGA / writable device)
 
 
 # --------------------------------------------------------------------------
@@ -114,6 +115,11 @@ class MemoryBackend(ABC):
 
     def physical_read(self, address: int, size: int) -> bytes | None:
         return None
+
+    def physical_write(self, address: int, data: bytes) -> bool:
+        """Write ``data`` at a *physical* address. Only writable acquisition
+        devices (a PCILeech FPGA card) support this; the default refuses."""
+        return False
 
     def close(self) -> None:
         pass
@@ -203,31 +209,48 @@ class LiveBackend(MemoryBackend):
 # --------------------------------------------------------------------------
 class MemProcFSBackend(MemoryBackend):
     name = "MemProcFS (physical RAM virtualization)"
-    capabilities = Capabilities(physical=True, hidden_detection=True, page_tables=True)
+    # A live FPGA/PCILeech device is writable; a read-only dump is not. The
+    # capability is corrected per-device in try_create so the UI never offers a
+    # DMA write against a source that can't take one.
+    capabilities = Capabilities(physical=True, hidden_detection=True,
+                                page_tables=True, physical_write=False)
 
-    def __init__(self, vmm) -> None:
+    def __init__(self, vmm, device: str = "") -> None:
         self._vmm = vmm
+        self._device = device
 
     @classmethod
     def try_create(cls, device: str | None = None) -> MemProcFSBackend | None:
         """
         Attempt to initialize MemProcFS. ``device`` is a raw/crash dump path, or
-        a live-acquisition device such as 'pmem' (WinPMEM) / 'fpga'. Returns None
-        (so the caller falls back to LiveBackend) on any failure.
+        a live-acquisition device: 'fpga' (a PCILeech FPGA DMA card, e.g. an
+        Artix-7 100T board) or 'pmem' (the WinPMEM driver). Returns None (so the
+        caller falls back to LiveBackend) on any failure.
         """
         try:
             import memprocfs  # type: ignore
         except Exception:
             logbus.trace(SRC, "memprocfs not installed; using live backend")
             return None
-        # Candidate devices: explicit first, then live WinPMEM.
+        # Candidate devices: an explicit request first, then the FPGA DMA card,
+        # then the live WinPMEM driver. LeechCore fast-fails when no FPGA is
+        # attached, so probing 'fpga' is cheap when the card is absent.
         candidates = [device] if device else []
-        candidates += ["pmem"]
+        candidates += ["fpga", "pmem"]
         for dev in candidates:
+            if not dev:
+                continue
             try:
                 vmm = memprocfs.Vmm(["-device", dev])
+                backend = cls(vmm, device=dev)
+                # A physical device (fpga/pmem) can be written back over DMA; a
+                # dump file is inspected read-only.
+                backend.capabilities = Capabilities(
+                    physical=True, hidden_detection=True, page_tables=True,
+                    physical_write=dev in ("fpga", "pmem"),
+                )
                 logbus.success(SRC, f"MemProcFS initialized on device '{dev}'")
-                return cls(vmm)
+                return backend
             except Exception as exc:  # noqa: BLE001
                 logbus.trace(SRC, f"MemProcFS device '{dev}' unavailable", str(exc))
         logbus.warn(SRC, "MemProcFS present but no acquisition device initialized")
@@ -280,6 +303,17 @@ class MemProcFSBackend(MemoryBackend):
         except Exception as exc:  # noqa: BLE001
             logbus.trace(SRC, f"MemProcFS physical read failed @0x{address:x}", str(exc))
             return None
+
+    def physical_write(self, address: int, data: bytes) -> bool:
+        if not self.capabilities.physical_write:
+            logbus.warn(SRC, f"device '{self._device}' is read-only; write refused")
+            return False
+        try:
+            self._vmm.memory.write(address, bytes(data))
+            return True
+        except Exception as exc:  # noqa: BLE001
+            logbus.error(SRC, f"MemProcFS physical write failed @0x{address:x}", str(exc))
+            return False
 
     def close(self) -> None:
         try:
