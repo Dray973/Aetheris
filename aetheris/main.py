@@ -20,7 +20,10 @@ def run_app() -> int:
 
     from PyQt6.QtGui import QIcon
 
+    from .core import crashreport
     from .ui.mainwindow import ICON_PATH, MainWindow
+
+    crashreport.install()          # scrubbed crash file on any unhandled exception
 
     app = QApplication(sys.argv)
     app.setApplicationName("Aetheris Quantum Core")
