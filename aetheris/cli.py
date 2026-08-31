@@ -31,7 +31,7 @@ def _gen(cmd: str, fmt: str) -> tuple[str, str]:
     from .network import connections
 
     if cmd == "report":
-        procs = processes.snapshot()
+        procs = processes.snapshot(sign=True)
         conns = connections.snapshot(resolve_geo=True)
         if fmt == "md":
             return report.session_markdown(procs, conns), "md"

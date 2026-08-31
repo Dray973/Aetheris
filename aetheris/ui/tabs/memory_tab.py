@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import psutil
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -101,14 +102,15 @@ class MemoryTab(QWidget):
 
         split = QSplitter(Qt.Orientation.Vertical)
 
-        self.table = QTableWidget(0, 8)
+        self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels(
-            ["PID", "Name", "User", "CPU %", "Mem (MB)", "Threads", "Status", "Exe"]
+            ["PID", "Name", "User", "CPU %", "Mem (MB)", "Threads", "Status",
+             "Signed", "Exe"]
         )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
-        self.table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(8, QHeaderView.ResizeMode.Stretch)
         self.table.doubleClicked.connect(self._open_autopsy)
         split.addWidget(self.table)
 
@@ -162,7 +164,7 @@ class MemoryTab(QWidget):
     def refresh(self) -> None:
         if self._worker and self._worker.isRunning():
             return
-        self._worker = Worker(processes.snapshot, enrich=False)
+        self._worker = Worker(processes.snapshot, sign=True)
         self._worker.done.connect(self._populate)
         self._worker.start()
 
@@ -176,11 +178,13 @@ class MemoryTab(QWidget):
         self.table.setRowCount(len(shown))
         for i, r in enumerate(shown):
             vals = [str(r.pid), r.name, r.username, f"{r.cpu_percent:.1f}",
-                    _fmt_mb(r.mem_rss), str(r.num_threads), r.status, r.exe]
+                    _fmt_mb(r.mem_rss), str(r.num_threads), r.status, r.signature, r.exe]
             for c, v in enumerate(vals):
                 item = QTableWidgetItem(v)
                 if c in (0, 3, 4, 5):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if c == 7 and r.signature == "unsigned":       # flag unsigned images
+                    item.setForeground(QColor("#e0b341"))
                 self.table.setItem(i, c, item)
         self.count_lbl.setText(f"{len(shown)} / {len(self._rows)} processes")
 

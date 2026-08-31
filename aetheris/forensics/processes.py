@@ -4,8 +4,9 @@ Process autopsy model.
 psutil provides the reliable cross-cut (pid, name, user, cpu, memory, exe path,
 connections). On top of that we layer best-effort Windows-only enrichment:
 
-  * ASLR / DEP mitigation policy via GetProcessMitigationPolicy
-  * Authenticode signature state via WinVerifyTrust (best effort)
+  * ASLR / DEP mitigation policy via GetProcessMitigationPolicy (``enrich=True``)
+  * Authenticode signature state of the image via WinVerifyTrust + catalog,
+    cached per path (``sign=True``)
 
 Both enrichments degrade to "unknown" when the query is denied or unavailable,
 so the process list is always populated even from a non-elevated session.
@@ -19,7 +20,7 @@ from dataclasses import asdict, dataclass
 
 import psutil
 
-from ..core import dryrun, logbus
+from ..core import dryrun, logbus, signing
 from ..core import winapi as W
 
 SRC = "forensics.processes"
@@ -67,6 +68,9 @@ def _query_mitigations(pid: int) -> tuple[str, str]:
     try:
         dep = aslr = "unknown"
         try:
+            # DEP is permanently on for 64-bit processes, and
+            # GetProcessMitigationPolicy(ProcessDEPPolicy) is unsupported for
+            # them (fails -> "unknown"). It only reports for 32-bit processes.
             dep_pol = _PROCESS_MITIGATION_DEP_POLICY()
             if W.kernel32.GetProcessMitigationPolicy(
                 h, _ProcessDEPPolicy, ctypes.byref(dep_pol), ctypes.sizeof(dep_pol)
@@ -88,10 +92,12 @@ def _query_mitigations(pid: int) -> tuple[str, str]:
         W.kernel32.CloseHandle(h)
 
 
-def snapshot(enrich: bool = False) -> list[ProcessInfo]:
+def snapshot(enrich: bool = False, sign: bool = False) -> list[ProcessInfo]:
     """
     Return a list of ProcessInfo for all visible processes.
     ``enrich=True`` adds mitigation queries (slower; opens each process).
+    ``sign=True`` fills the Authenticode ``signature`` of each image (cached per
+    path, so repeated snapshots only pay for images not seen before).
     """
     out: list[ProcessInfo] = []
     for p in psutil.process_iter(
@@ -113,6 +119,8 @@ def snapshot(enrich: bool = False) -> list[ProcessInfo]:
             )
             if enrich:
                 pi.dep, pi.aslr = _query_mitigations(pi.pid)
+            if sign and pi.exe:
+                pi.signature = signing.label(pi.exe)
             out.append(pi)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
