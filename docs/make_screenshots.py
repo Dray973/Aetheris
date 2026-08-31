@@ -34,6 +34,8 @@ from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 from aetheris.core import timeline as tl  # noqa: E402
 from aetheris.core.persistence import PersistenceEntry  # noqa: E402
 from aetheris.core.services import ServiceInfo  # noqa: E402
+from aetheris.forensics import memvirt  # noqa: E402
+from aetheris.forensics.memvirt import Capabilities  # noqa: E402
 from aetheris.forensics.processes import ProcessInfo  # noqa: E402
 from aetheris.network.connections import Connection  # noqa: E402
 from aetheris.storage import mft  # noqa: E402
@@ -221,14 +223,35 @@ def main() -> None:
     aut._compile()
     w.tabs.setCurrentIndex(4); pump(0.3); shot("07-autoshell.png")
 
-    # 8) Plugins (v2 gallery: trust + declared permission scope)
-    plugins_tab = w.tabs.widget(6)
+    # 8) DMA / Physical Memory (PCILeech FPGA read + guarded write)
+    dma_tab = w.tabs.widget(6)
+
+    class _StubFPGA:
+        name = "MemProcFS · PCILeech FPGA (Artix-7 100T)"
+        capabilities = Capabilities(physical=True, hidden_detection=True,
+                                    page_tables=True, physical_write=True)
+
+    dma_tab._backend = _StubFPGA()
+    dma_tab._refresh_capabilities()
+    dma_tab.read_addr.setText("1a2b3000")
+    dma_tab.write_addr.setText("1a2b3040")
+    dma_tab.write_bytes.setText("90 90 90 90")
+    sample = (bytes.fromhex("4d5a9000030000000400000000ff0000b8000000")
+              + b"\x00" * 12 + b"This program cannot be run in DOS mode.\r\r\n$"
+              + b"\x00" * 40)
+    dma_tab.out.appendPlainText("── physical read @ 0x1a2b3000 (256 bytes) ──")
+    dma_tab.out.appendPlainText(memvirt.format_hex(sample, base_addr=0x1a2b3000))
+    dma_tab.out.appendPlainText("✓ wrote 4 bytes @ 0x1a2b3040")
+    w.tabs.setCurrentIndex(6); pump(0.4); shot("08-dma.png")
+
+    # 9) Plugins (v2 gallery: trust + declared permission scope)
+    plugins_tab = w.tabs.widget(7)
     for i in range(plugins_tab.list.count()):
         if plugins_tab.list.item(i).text().startswith("system-gauges"):
             plugins_tab.list.setCurrentRow(i)
             plugins_tab._run()
             break
-    w.tabs.setCurrentIndex(6); pump(0.5); shot("08-plugins.png")
+    w.tabs.setCurrentIndex(7); pump(0.5); shot("09-plugins.png")
 
     if "--gif" in sys.argv:
         _build_gif()
@@ -243,7 +266,7 @@ def _build_gif() -> None:
         return
     order = ["01-memory.png", "02-storage-treemap.png", "03-network.png",
              "04-services.png", "05-persistence.png", "06-timeline.png",
-             "07-autoshell.png", "08-plugins.png"]
+             "07-autoshell.png", "08-dma.png", "09-plugins.png"]
     imgs = []
     for f in order:
         im = Image.open(OUT / f).convert("RGB")

@@ -15,7 +15,7 @@ control.
 > **Plugin API v2** (declared permissions + a hash trust-list), and a scrubbed
 > **crash reporter**. Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 185 tests. Optional native
+> pass `mypy --strict` + `ruff` and are covered by 195 tests. Optional native
 > engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
 > data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
 > status* below rather than pretending to be complete.
@@ -32,7 +32,8 @@ place of live machine data):
 | ![Memory](docs/screenshots/01-memory.png) **① Memory / Process Autopsy** — process table with a live Authenticode **Signed** column (unsigned in amber), CPU/RAM chart, Assembly Studio, and the audit console. | ![Storage](docs/screenshots/02-storage-treemap.png) **② Storage / MFT** — squarified space-utilization tree-map with drill-down. |
 | ![Network](docs/screenshots/03-network.png) **③ Network / Firewall** — socket→process table with GeoIP + per-process B/s columns, live throughput chart, "Nuke" isolation. | ![Services](docs/screenshots/04-services.png) **④ Service & Driver Inspector** — services + kernel drivers with signed/loaded status and **unquoted-service-path** privesc candidates (red); reversible start/stop/start-type. |
 | ![Persistence](docs/screenshots/05-persistence.png) **⑤ Persistence Map** — one screen unifying Run/Startup + auto/boot services + logon/boot tasks; reversible enable/disable. | ![Timeline](docs/screenshots/06-timeline.png) **⑥ Session Timeline** — periodic state snapshots; diff *any two* points (processes/ports/connections/autoruns added·removed). |
-| ![Auto-Shell](docs/screenshots/07-autoshell.png) **⑦ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. | ![Plugins](docs/screenshots/08-plugins.png) **⚙ Plugins v2** — text + widget tools with a declared **permission scope** and a hash **trust** state; untrusted runs are gated. |
+| ![Auto-Shell](docs/screenshots/07-autoshell.png) **⑦ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. | ![DMA](docs/screenshots/08-dma.png) **⑧ DMA / Physical** — PCILeech **FPGA** (Artix-7 100T) physical-memory read + a **guarded DMA write** (dry-run, audited, PANIC-reversible) over MemProcFS; controls stay disabled until a writable device is attached. |
+| ![Plugins](docs/screenshots/09-plugins.png) **⚙ Plugins v2** — text + widget tools with a declared **permission scope** and a hash **trust** state; untrusted runs are gated. | |
 
 Regenerate with `python docs/make_screenshots.py --gif`. For a live, auto-
 cycling demo to screen-record, run `python docs/demo_mode.py`. The layered
@@ -45,7 +46,8 @@ aetheris/
 ├── core/          privileges, native bindings, Authenticode signing, hash-chained audit,
 │                  dry-run, Omega Rollback, registry, services, taskaudit, persistence,
 │                  timeline, plugins, scheduler, settings, reports, crash reporter
-├── forensics/     process autopsy (+ signature), RAM matrix, Capstone/Keystone studio
+├── forensics/     process autopsy (+ signature), RAM matrix, Capstone/Keystone studio,
+│                  PCILeech-FPGA physical read + guarded DMA write (memvirt/dma)
 ├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator, handle strip
 ├── network/       socket→process interceptor, per-process B/s (ETW), GeoIP, firewall isolation
 ├── automation/    natural-language → reviewed PowerShell compiler
@@ -55,7 +57,7 @@ aetheris/
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (185 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (195 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ## Install & run
@@ -96,7 +98,7 @@ features and degrade gracefully when absent (the UI tells you what's missing).
 
 ```powershell
 pip install .[test]
-pytest                                 # 185 tests over the cores
+pytest                                 # 195 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
@@ -265,6 +267,7 @@ attaches everything to the GitHub Release automatically.
 | ④ Shell/Registry | Regshot-style snapshot diff (Markdown/structured/history), reversible privacy toggles, DiagTrack disable, context-menu editor, **multi-level cascading submenu builder**, **Autoruns manager**, **Service & Driver Inspector** (signed/loaded status + an **unquoted-service-path** privesc finder; reversible start/stop/start-type), **Scheduled-Task auditor** (temp-dir/unsigned/encoded-shell/logon-persistence flags + Markdown export), **Startup / Persistence Map** (Run/Startup + auto/boot services + logon/boot tasks unified; reversible enable/disable) | — |
 | ⑤ Auto-Shell | deterministic NL→PowerShell: find/move, kill-by-memory, kill-by-name, CPU affinity, flush DNS, empty recycle bin, clear temp, restart service, largest-files — all behind a confirm gate + a refusal guard for "kill all processes"-style inputs | still deterministic (no LLM) by design |
 | ⑥ Timeline | periodic lightweight snapshots (processes, listening ports, connections, autoruns); **diff any two points** in the session (added·removed), registry-diff-style table; pairs with the persistent audit log | — |
+| ⑦ DMA / Physical | **guarded DMA-write pipeline** — dry-run rehearsal, a before-bytes snapshot, tamper-evident audit, and PANIC-reversible rollback, behind a confirm-gated UI whose read/write controls stay disabled until a *writable* device attaches; the write / rollback / dry-run / read-only-refusal paths are unit-tested against a fake backend | **PCILeech FPGA physical read + write** (Artix-7 **100T** and similar) over **MemProcFS/LeechCore** — needs the `memprocfs` lib, the LeechCore/FTDI drivers, the card's PCILeech firmware, and an elevated token; not exercised by CI |
 | ⚙ Plugins v2 | text + widget tools (built-in + user `*.py`), runnable in-app and via `aetheris-cli`; each declares a **permission scope** and carries a **trust** state (built-in / trusted / modified / untrusted, via a hash trust-list); untrusted runs are confirm-gated — **disclosure + provenance, not a sandbox** | — |
 
 Environment-gated items report their status in the UI (e.g. the per-process
