@@ -13,9 +13,13 @@ a staging file next to the running one. It does **not** interrupt the session �
 the update is *applied on the next launch*: ``apply_pending()`` (called early at
 startup, before the GUI) swaps the staged exe in and relaunches.
 
-Only the frozen one-file exe self-updates. A dev/pip install logs that updates
-are managed by git/pip instead. Everything is verifiable with a ``file://``
-manifest + a local file (no server needed).
+Only the frozen one-file exe self-updates. A source / pip install (the
+per-user installer's venv layout) is updated by re-running the installer or via
+git, so it never stages a frozen exe: ``check_and_stage`` no-ops there, and
+``apply_pending`` *discards* any exe that a prior build wrongly staged — so a
+source install can't get wedged perpetually claiming "update staged, applies on
+next launch" for a swap it can never perform. Everything is verifiable with a
+``file://`` manifest + a local file (no server needed).
 """
 from __future__ import annotations
 
@@ -183,6 +187,21 @@ def pending_version() -> str:
     return str(settings().get("pending_update_version", "")) if has_pending() else ""
 
 
+def _discard_pending(reason: str) -> None:
+    """Drop a staged exe we can't (or won't) apply, and clear the pending flag,
+    so the UI stops reporting a phantom update. Best-effort; never raises."""
+    try:
+        staging_path().unlink(missing_ok=True)
+    except OSError:
+        pass
+    try:
+        settings().update(pending_update_version="")
+        settings().save()
+    except Exception:  # noqa: BLE001 -- cleanup must never crash startup
+        pass
+    logbus.trace(SRC, f"discarded staged update ({reason})")
+
+
 # --- apply (next launch) --------------------------------------------------
 def apply_pending() -> bool:
     """
@@ -196,8 +215,11 @@ def apply_pending() -> bool:
     exe = current_exe()
     staged = staging_path()
     if exe is None:
-        # Dev / pip install: don't self-modify source; leave the staged file.
-        logbus.warn(SRC, "pending update ignored (not a frozen exe; use git/pip)")
+        # Source / pip install: there is no exe to swap, so a staged frozen exe
+        # can never be applied here. Discard it (and the pending flag) instead
+        # of leaving it — otherwise the UI claims "update staged, applies on next
+        # launch" forever. Source installs update via the installer or git.
+        _discard_pending("not a frozen exe; update via the installer or git")
         return False
     try:
         swapper = config_dir() / "update" / "swap.cmd"
@@ -223,8 +245,15 @@ def apply_pending() -> bool:
 
 
 def check_and_stage(url: str | None = None) -> tuple[bool, str]:
-    """One-shot: check the manifest and stage a newer version if found."""
+    """One-shot: check the manifest and stage a newer version if found.
+
+    A source / pip install can't apply a frozen-exe swap, so it never stages one
+    (that only produces a permanent, un-appliable "pending" nag). It reports the
+    available version instead; the user updates via the installer or git."""
     info = check(url)
     if info is None:
         return False, "no update available"
+    if not is_frozen():
+        return False, (f"v{info.version} available — this is a source install; "
+                       "update by re-running the installer or via git")
     return stage(info)

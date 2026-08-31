@@ -218,6 +218,17 @@ class MainWindow(QMainWindow):
                                     f"You're up to date (v{__version__}).")
             return
         detail = f"\n\n{info.notes}" if info.notes else ""
+        # A source / pip install can't apply a frozen-exe swap — staging one only
+        # produces a permanent, un-appliable "pending" nag. Tell the user how to
+        # actually update instead of downloading an exe we can never install.
+        if not updater.is_frozen():
+            QMessageBox.information(
+                self, "Update available",
+                f"Version {info.version} is available (you have {__version__})."
+                f"{detail}\n\nThis is a source install, so it updates by "
+                "re-running the installer (or `git pull` for a dev checkout) — "
+                "the built-in self-updater only applies to the standalone .exe.")
+            return
         if QMessageBox.question(
             self, "Update available",
             f"Version {info.version} is available (you have {__version__})."
