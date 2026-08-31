@@ -3,7 +3,7 @@
 Render the Aetheris UI to the screenshots used in the README.
 
 Renders the *real* widgets (native Windows platform, so fonts render) but feeds
-each data-bearing tab **representative, non-identifying** data — so the images
+each data-bearing tab **representative, non-identifying** data -- so the images
 show the genuine app without leaking real process paths, usernames, or remote
 IPs from the machine that generated them.
 
@@ -14,9 +14,9 @@ The window is rendered off the visible desktop so nothing pops up on screen.
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
-import math
 import time
 from pathlib import Path
 
@@ -28,12 +28,16 @@ sys.path.insert(0, str(REPO))
 OUT = REPO / "docs" / "screenshots"
 OUT.mkdir(parents=True, exist_ok=True)
 
-from PyQt6.QtWidgets import QApplication, QTabWidget          # noqa: E402
 from PyQt6.QtCore import QEventLoop                            # noqa: E402
-from aetheris.ui.mainwindow import MainWindow                 # noqa: E402
+from PyQt6.QtWidgets import QApplication, QTabWidget          # noqa: E402
+
+from aetheris.core import timeline as tl                      # noqa: E402
+from aetheris.core.persistence import PersistenceEntry        # noqa: E402
+from aetheris.core.services import ServiceInfo                # noqa: E402
 from aetheris.forensics.processes import ProcessInfo          # noqa: E402
 from aetheris.network.connections import Connection           # noqa: E402
 from aetheris.storage import mft                              # noqa: E402
+from aetheris.ui.mainwindow import MainWindow                 # noqa: E402
 
 app = QApplication(sys.argv)
 w = MainWindow()
@@ -56,10 +60,19 @@ def shot(name: str) -> None:
     print(f"saved {name}: {pm.width()}x{pm.height()}")
 
 
+def _inner_tab(widget, label: str) -> None:
+    """Switch a tab's inner QTabWidget to the sub-panel named ``label``."""
+    for tw in widget.findChildren(QTabWidget):
+        for i in range(tw.count()):
+            if tw.tabText(i) == label:
+                tw.setCurrentIndex(i)
+                return
+
+
 def main() -> None:
     pump(1.5)
 
-    # 1) Memory / Process Autopsy
+    # 1) Memory / Process Autopsy (note the live Authenticode "Signed" column)
     mem = w.tabs.widget(0)
     mem._timer.stop()
     mem._populate([
@@ -74,7 +87,8 @@ def main() -> None:
                     2.0, 388 * 2**20, 51, "running", "on", "on", "signed"),
         ProcessInfo(880, "explorer.exe", "DESKTOP\\user", r"C:\Windows\explorer.exe",
                     1.2, 180 * 2**20, 62, "running", "on", "on", "signed"),
-        ProcessInfo(9002, "python.exe", "DESKTOP\\user", r"C:\Python312\python.exe",
+        ProcessInfo(9002, "helper.exe", "DESKTOP\\user",
+                    r"C:\Users\user\AppData\Local\Temp\helper.exe",
                     12.7, 96 * 2**20, 9, "running", "on", "off", "unsigned"),
         ProcessInfo(512, "svchost.exe", "NT AUTHORITY\\SYSTEM",
                     r"C:\Windows\System32\svchost.exe",
@@ -105,12 +119,9 @@ def main() -> None:
         for name, size in kids:
             recs.append(R(idx, True, False, name, size, top_idx)); idx += 1
     st._show_mft(recs); st._build_treemap()
-    for tw in st.findChildren(QTabWidget):
-        for i in range(tw.count()):
-            if tw.tabText(i) in ("Tree-map", "Raw MFT Scan"):
-                tw.setCurrentIndex(i)
+    _inner_tab(st, "Tree-map")
     st.treemap.resize(1400, 560); st.treemap._relayout()
-    w.tabs.setCurrentIndex(1); pump(0.4); shot("02-storage-treemap.png")
+    w.tabs.setCurrentIndex(1); pump(0.5); shot("02-storage-treemap.png")
 
     # 3) Network
     net = w.tabs.widget(2)
@@ -134,26 +145,90 @@ def main() -> None:
     for i in range(120):
         net.throughput.push({"up": 40 + 20 * math.sin(i / 8),
                              "down": 420 + 120 * math.sin(i / 10)})
-    w.tabs.setCurrentIndex(2); pump(0.4); shot("03-network.png")
+    w.tabs.setCurrentIndex(2); pump(0.5); shot("03-network.png")
 
-    # 4) Shell / Registry
-    w.tabs.setCurrentIndex(3); pump(0.3); shot("04-shell.png")
+    # 4) Shell -> Services & Drivers (unquoted-path privesc finder in red)
+    shell = w.tabs.widget(3)
+    shell._services = [
+        ServiceInfo("Dnscache", "DNS Client", r"C:\Windows\System32\svchost.exe",
+                    r"C:\Windows\System32\svchost.exe", "auto", "service",
+                    "NT AUTHORITY\\NetworkService", "running", "signed", False),
+        ServiceInfo("AppUpdater", "App Updater", r'C:\Program Files\My App\upd.exe',
+                    r'C:\Program Files\My App\upd.exe', "auto", "service",
+                    "LocalSystem", "running", "signed", True),   # unquoted path
+        ServiceInfo("HelperSvc", "Vendor Helper",
+                    r"C:\Users\user\AppData\Local\Temp\helper.exe",
+                    r"C:\Users\user\AppData\Local\Temp\helper.exe", "auto", "service",
+                    "LocalSystem", "stopped", "unsigned", False),
+        ServiceInfo("disk", "Disk Driver", r"C:\Windows\System32\drivers\disk.sys",
+                    r"C:\Windows\System32\drivers\disk.sys", "boot", "driver", "",
+                    "loaded", "signed", False),
+        ServiceInfo("nvlddmkm", "NVIDIA Kernel", r"C:\Windows\System32\drivers\nvlddmkm.sys",
+                    r"C:\Windows\System32\drivers\nvlddmkm.sys", "manual", "driver", "",
+                    "not loaded", "signed", False),
+    ]
+    _inner_tab(shell, "Services & Drivers")
+    shell._apply_svc_filter()
+    w.tabs.setCurrentIndex(3); pump(0.4); shot("04-services.png")
 
-    # 5) Auto-Shell
+    # 5) Shell -> Persistence Map (unified autostart view)
+    shell._pm = [
+        PersistenceEntry("Run", "OneDrive",
+                         r"C:\Users\user\AppData\Local\Microsoft\OneDrive\OneDrive.exe /background",
+                         r"HKCU\...\CurrentVersion\Run",
+                         r"C:\Users\user\AppData\Local\Microsoft\OneDrive\OneDrive.exe",
+                         "signed", True),
+        PersistenceEntry("Startup", "Spotify",
+                         r"C:\Users\user\AppData\Roaming\Spotify\Spotify.exe",
+                         "Startup folder (user)",
+                         r"C:\Users\user\AppData\Roaming\Spotify\Spotify.exe", "signed", True),
+        PersistenceEntry("Service", "AppUpdater", r'"C:\Program Files\My App\upd.exe"',
+                         "Service (auto)", r"C:\Program Files\My App\upd.exe", "signed", True),
+        PersistenceEntry("Task", "\\Vendor\\SyncTask",
+                         r"C:\Users\user\AppData\Local\Temp\sync.exe",
+                         r"\Vendor\SyncTask", r"C:\Users\user\AppData\Local\Temp\sync.exe",
+                         "unsigned", True),
+    ]
+    _inner_tab(shell, "Persistence Map")
+    shell._apply_pm_filter()
+    w.tabs.setCurrentIndex(3); pump(0.4); shot("05-persistence.png")
+
+    # 6) Timeline -> state diff between two session snapshots
+    tlab = w.tabs.widget(5)
+    now = time.time()
+    tlab._timeline.add(tl.Snapshot(
+        0, now - 300,
+        processes={(1234, "chrome.exe"), (4020, "Code.exe"), (880, "explorer.exe")},
+        listening={("tcp", 135), ("tcp", 445)},
+        connections={"142.250.72.206:443"},
+        autoruns={"OneDrive @ HKCU\\Run"}))
+    tlab._timeline.add(tl.Snapshot(
+        1, now,
+        processes={(4020, "Code.exe"), (880, "explorer.exe"), (9002, "powershell.exe")},
+        listening={("tcp", 135), ("tcp", 445), ("tcp", 5985)},
+        connections={"142.250.72.206:443", "185.199.108.153:443"},
+        autoruns={"OneDrive @ HKCU\\Run", "SyncTask @ \\Vendor\\SyncTask"}))
+    tlab._refresh_pickers()
+    tlab.combo_a.setCurrentIndex(0)
+    tlab.combo_b.setCurrentIndex(1)
+    tlab._diff()
+    w.tabs.setCurrentIndex(5); pump(0.4); shot("06-timeline.png")
+
+    # 7) Auto-Shell
     aut = w.tabs.widget(4)
     aut.input.setText("Terminate all background processes utilizing more than "
                       "350MB of system memory right now.")
     aut._compile()
-    w.tabs.setCurrentIndex(4); pump(0.3); shot("05-autoshell.png")
+    w.tabs.setCurrentIndex(4); pump(0.3); shot("07-autoshell.png")
 
-    # 6) Plugins - run the live-gauges widget plugin so the shot shows a widget
-    plugins_tab = w.tabs.widget(5)
+    # 8) Plugins (v2 gallery: trust + declared permission scope)
+    plugins_tab = w.tabs.widget(6)
     for i in range(plugins_tab.list.count()):
-        if plugins_tab.list.item(i).text() == "system-gauges":
+        if plugins_tab.list.item(i).text().startswith("system-gauges"):
             plugins_tab.list.setCurrentRow(i)
             plugins_tab._run()
             break
-    w.tabs.setCurrentIndex(5); pump(0.5); shot("06-plugins.png")
+    w.tabs.setCurrentIndex(6); pump(0.5); shot("08-plugins.png")
 
     if "--gif" in sys.argv:
         _build_gif()
@@ -167,14 +242,15 @@ def _build_gif() -> None:
         print("Pillow not installed; skipping GIF")
         return
     order = ["01-memory.png", "02-storage-treemap.png", "03-network.png",
-             "04-shell.png", "05-autoshell.png", "06-plugins.png"]
+             "04-services.png", "05-persistence.png", "06-timeline.png",
+             "07-autoshell.png", "08-plugins.png"]
     imgs = []
     for f in order:
         im = Image.open(OUT / f).convert("RGB")
         w2 = 1100
         imgs.append(im.resize((w2, int(im.height * w2 / im.width)), Image.LANCZOS))
     imgs[0].save(OUT / "walkthrough.gif", save_all=True, append_images=imgs[1:],
-                 duration=2200, loop=0, optimize=True)
+                 duration=2000, loop=0, optimize=True)
     print("saved walkthrough.gif")
 
 

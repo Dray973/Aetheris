@@ -94,7 +94,13 @@ sequenceDiagram
 | core | `audit` | tamper-evident SHA-256 hash-chained audit log (verify + JSONL persist) |
 | core | `dryrun` | global dry-run flag; opted-in destructive ops log intent instead of acting |
 | core | `registry` | snapshot/diff (+ save/load, structured rows), privacy toggles, context-menu + cascading builder |
-| core | `settings` / `report` / `plugins` / `scheduler` | persisted prefs; CSV/JSON/HTML/MD serializers; text+widget plugin discovery; Task Scheduler integration |
+| core | `signing` | Authenticode check (WinVerifyTrust + catalog fallback), cached |
+| core | `services` | service/driver enumeration, unquoted-path finder, reversible start/stop/start-type |
+| core | `taskaudit` | scheduled-task XML parse + suspicion flags, reversible enable/disable, MD export |
+| core | `persistence` | unified Run/Startup + services + tasks map; reversible toggle dispatch |
+| core | `timeline` | session state snapshots + any-two-point diff |
+| core | `crashreport` | scrubbed last-resort excepthook crash file |
+| core | `settings` / `report` / `plugins` / `scheduler` | persisted prefs; CSV/JSON/HTML/MD serializers; text+widget plugin discovery (+ permissions/trust); Task Scheduler integration |
 | core | `autoruns` / `updater` | logon/boot autostart enum + reversible disable; self-update (manifest check → stage → apply-on-next-launch) |
 | — | `cli` / `plugins/*` | headless `aetheris-cli` capture; built-in extension tools (incl. a GUI widget plugin) |
 | forensics | `processes` / `memory` / `disasm` / `memvirt` | autopsy, RAM matrix, Capstone/Keystone, VM scanner backends |

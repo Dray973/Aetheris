@@ -6,12 +6,19 @@ natural-language automation shell into one dashboard. It targets power users,
 security researchers, and systems administrators operating on machines they
 control.
 
-> **Status: working v0.1.** The full decoupled architecture, the safety shield,
-> the live audit console, and functional cores for every module are in place and
-> exercised by the test suite. Optional native engines (MemProcFS, capstone,
-> keystone) degrade gracefully with an install hint when absent; the one
-> optional data drop-in (a GeoLite2 DB for city-level GeoIP) is clearly labelled
-> in *Feature status* below rather than pretending to be complete.
+> **Status: v0.1.4.** A strictly decoupled architecture, a persistent
+> tamper-evident (hash-chained) audit log, a global **dry-run** rehearsal mode,
+> and the Omega-Rollback safety shield back every module. Recent additions: a
+> **Service & Driver Inspector** (with an unquoted-service-path privesc finder),
+> a **Scheduled-Task auditor**, a unified **Startup / Persistence Map**, a
+> session **Timeline / state-diff**, real **Authenticode** verification, a
+> **Plugin API v2** (declared permissions + a hash trust-list), and a scrubbed
+> **crash reporter**. Every write is confirm-gated, reversible via PANIC, audited,
+> and dry-run-aware; long/native work runs off the UI thread. The pure layers
+> pass `mypy --strict` + `ruff` and are covered by 185 tests. Optional native
+> engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
+> data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
+> status* below rather than pretending to be complete.
 
 ## Walkthrough
 
@@ -22,9 +29,10 @@ place of live machine data):
 
 | | |
 |---|---|
-| ![Memory](docs/screenshots/01-memory.png) **① Memory / Process Autopsy** — process table with a live Authenticode **signature** column, CPU/RAM chart, Assembly Studio, and the audit console. | ![Storage](docs/screenshots/02-storage-treemap.png) **② Storage / MFT** — squarified space-utilization tree-map with drill-down. |
-| ![Network](docs/screenshots/03-network.png) **③ Network / Firewall** — socket→process table with GeoIP + per-process B/s columns, live throughput chart, "Nuke" isolation. | ![Shell](docs/screenshots/04-shell.png) **④ Shell / Registry** — snapshot-diff suite, privacy toggles, cascading menus, and the Autoruns manager. |
-| ![Auto-Shell](docs/screenshots/05-autoshell.png) **⑤ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. | ![Plugins](docs/screenshots/06-plugins.png) **⚙ Plugins** — text + widget extension tools (here the live-gauges widget), runnable in-app and via `aetheris-cli`. |
+| ![Memory](docs/screenshots/01-memory.png) **① Memory / Process Autopsy** — process table with a live Authenticode **Signed** column (unsigned in amber), CPU/RAM chart, Assembly Studio, and the audit console. | ![Storage](docs/screenshots/02-storage-treemap.png) **② Storage / MFT** — squarified space-utilization tree-map with drill-down. |
+| ![Network](docs/screenshots/03-network.png) **③ Network / Firewall** — socket→process table with GeoIP + per-process B/s columns, live throughput chart, "Nuke" isolation. | ![Services](docs/screenshots/04-services.png) **④ Service & Driver Inspector** — services + kernel drivers with signed/loaded status and **unquoted-service-path** privesc candidates (red); reversible start/stop/start-type. |
+| ![Persistence](docs/screenshots/05-persistence.png) **⑤ Persistence Map** — one screen unifying Run/Startup + auto/boot services + logon/boot tasks; reversible enable/disable. | ![Timeline](docs/screenshots/06-timeline.png) **⑥ Session Timeline** — periodic state snapshots; diff *any two* points (processes/ports/connections/autoruns added·removed). |
+| ![Auto-Shell](docs/screenshots/07-autoshell.png) **⑦ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. | ![Plugins](docs/screenshots/08-plugins.png) **⚙ Plugins v2** — text + widget tools with a declared **permission scope** and a hash **trust** state; untrusted runs are gated. |
 
 Regenerate with `python docs/make_screenshots.py --gif`. For a live, auto-
 cycling demo to screen-record, run `python docs/demo_mode.py`. The layered
@@ -34,18 +42,20 @@ design is documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ```
 aetheris/
-├── core/          privileges, native bindings, log bus, hash-chained audit, dry-run, Omega Rollback, registry, settings, reports
-├── forensics/     process autopsy, RAM matrix, Capstone/Keystone assembly studio
-├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator
-├── network/       socket→process interceptor, per-process B/s, GeoIP, firewall isolation
+├── core/          privileges, native bindings, Authenticode signing, hash-chained audit,
+│                  dry-run, Omega Rollback, registry, services, taskaudit, persistence,
+│                  timeline, plugins, scheduler, settings, reports, crash reporter
+├── forensics/     process autopsy (+ signature), RAM matrix, Capstone/Keystone studio
+├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator, handle strip
+├── network/       socket→process interceptor, per-process B/s (ETW), GeoIP, firewall isolation
 ├── automation/    natural-language → reviewed PowerShell compiler
-├── plugins/       built-in extension tools (top-memory, public-connections, …)
-├── cli.py         headless forensic capture (`aetheris-cli`)
+├── plugins/       built-in extension tools (top-memory, public-connections, …) + permissions
+├── cli.py         headless forensic capture (`aetheris-cli`, also `<exe> cli …`)
 └── ui/            PyQt6 window, theme, log drawer, telemetry charts, module tabs
-run.py             entry point + UAC elevation bootstrap
-pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points
+run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
+pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (121 tests) for the cores
+tests/             pytest suite (185 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ## Install & run
@@ -86,7 +96,7 @@ features and degrade gracefully when absent (the UI tells you what's missing).
 
 ```powershell
 pip install .[test]
-pytest                                 # 121 tests over the cores
+pytest                                 # 185 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
@@ -97,11 +107,17 @@ with no PyQt6 installed), registry diffing, dedupe, the memory hex formatter,
 per-process bandwidth attribution math, GeoIP field extraction (plus a real
 GeoLite2 lookup when a DB is present), the cascading-menu spec parser, the
 settings store and report serializers, the **tamper-evident hash-chained audit
-log**, **global dry-run** enforcement (a real op that must not mutate), the
-**Omega-Rollback PANIC round-trip**, the committed app-icon structure, and
-(Windows-only) the ETW sampler contract **and its TcpIp opcode/payload
-attribution** (via synthetic-record injection), the Restart-Manager lockers, and
-the live handle-strip round-trip. GitHub Actions (`.github/workflows/ci.yml`) runs
+log** (+ file persistence and tamper detection), **global dry-run** enforcement
+across terminate / Auto-Shell / registry / firewall / obliterate, the
+**Omega-Rollback PANIC round-trip**, the **service / task / persistence** models
+(unquoted-path detector, task suspicion heuristics, reversible-toggle dispatch),
+the **timeline state-diff**, **plugin permissions + trust lifecycle**, the crash
+reporter's scrubbing, and the obliterator guardrail; plus **pytest-qt** UI-thread
+tests that prove blocking native calls run off the event loop. Windows-only tests
+cover Authenticode signing (WinVerifyTrust + catalog), the ETW sampler **and its
+TcpIp opcode/payload attribution** (synthetic-record injection), the shared-handle
+restypes, the Restart-Manager lockers, and the live handle-strip round-trip.
+GitHub Actions (`.github/workflows/ci.yml`) runs
 it on Windows against Python 3.11 and 3.12 on every push/PR; a tag push runs
 `release.yml`, which builds `AetherisQuantumCore.exe`, **headlessly smoke-launches
 it**, compiles `AetherisSetup.exe`, and attaches both to a GitHub Release.
@@ -138,8 +154,13 @@ This suite is built to be **auditable and reversible**, not stealthy:
   address, handle op, and destructive action streams to the bottom drawer with
   return codes and a human-readable translation — and each event is linked into
   a **SHA-256 hash chain** (`core/audit.py`), so any later edit, deletion, or
-  reorder of the trail is detectable. The toolbar **🛡 Audit** button re-verifies
-  the chain on demand.
+  reorder of the trail is detectable. The chain is also **persisted** to
+  `%APPDATA%\AetherisQuantumCore\audit\session-<ts>.jsonl` (on by default) so a
+  forensic record survives the app closing; the toolbar **🛡 Audit** button
+  re-verifies the chain on demand, and `verify_audit_log()` re-checks a file.
+- **Crash reporter.** An unhandled exception writes a **scrubbed** crash file to
+  `%APPDATA%\…\crashes\` — the error + traceback only (no memory or process
+  data), with the home path and account name redacted so it's safe to share.
 
 The suite does **not** include a credential-extraction path against
 `HKLM\SAM` / `HKLM\SECURITY`; the registry tools operate on ordinary hives.
@@ -160,10 +181,16 @@ The suite does **not** include a credential-extraction path against
 
 ## Plugins & headless CLI
 
-- **Plugins** — drop a `*.py` in `%APPDATA%\AetherisQuantumCore\plugins` that
-  exposes a `PLUGIN`. Two kinds: **text** tools (over live process/connection
-  snapshots — run in the GUI *and* headlessly) and **widget** tools (return a
-  live QWidget, GUI-only). Built-ins: top-memory, public-connections,
+- **Plugins (v2)** — drop a `*.py` in `%APPDATA%\AetherisQuantumCore\plugins`
+  that exposes a `PLUGIN` (and, optionally, a `PERMISSIONS` list). Two kinds:
+  **text** tools (over live process/connection snapshots — run in the GUI *and*
+  headlessly) and **widget** tools (return a live QWidget, GUI-only). The gallery
+  shows each plugin's **declared permission scope** and a **trust** state — built
+  in, or (for user plugins) untrusted → trusted (once you record its hash) →
+  modified (tamper-evident if the file later changes); running an untrusted or
+  modified plugin is confirm-gated. This is **disclosure + provenance, not a
+  sandbox** — Python can't contain a plugin, so the gate discloses scope rather
+  than restricting it. Built-ins: top-memory, public-connections,
   listening-ports, and a live-gauges widget. They appear in the **⚙ Plugins**
   tab.
 - **Scheduled capture** — the toolbar **⏱ Schedule…** registers a Windows
@@ -235,8 +262,10 @@ attaches everything to the GitHub Release automatically.
 | ① Memory/Process | psutil autopsy, **Authenticode signature check** (WinVerifyTrust + catalog, cached), ASLR/DEP mitigation query (ASLR live; DEP is x64-permanent so it reports only for 32-bit procs), working-set trim, standby purge, file-cache flush, Capstone disasm of live memory, Keystone patch, **Virtual Memory Scanner** (live `VirtualQueryEx` region maps + `ReadProcessMemory` hex view), **live CPU/RAM telemetry chart (pyqtgraph)** | **MemProcFS** physical-RAM virtualization / hidden-process & physical reads — needs the `memprocfs` lib **and** an acquisition driver; not exercised by CI |
 | ② Storage/MFT | NTFS binary parse w/ **full $MFT run-list walk** (fragmented MFTs), fixups, **directory-tree reconstruction + squarified tree-map canvas** (drill-down), SHA-256 dedupe, ghost scan, guarded obliterator, **Restart-Manager lockers + raw handle stripping** (`NtQuerySystemInformation` handle table → `DuplicateHandle(DUPLICATE_CLOSE_SOURCE)`, timeout-guarded name queries) | — |
 | ③ Network | socket→process map, system bandwidth, **live throughput chart (pyqtgraph)**, INetFwPolicy2 isolate/deisolate w/ rollback, **offline IP geolocation** (geoip2 + GeoLite2 `.mmdb`; field extraction is unit-tested, and an opt-in test performs a real-DB lookup — `81.2.69.160 → GB · London` — when a GeoLite2 DB is present; one-command enable via `docs/fetch_geoip.py`) | **live per-process TCP B/s via ETW** — a real-time kernel **SystemTraceProvider** session (`NETWORK_TCPIP`) consuming classic `TcpIp` send/recv events and attributing bytes to the owning PID. CI verifies the sampler lifecycle, graceful degradation without elevation, the x64 struct ABI, and — via synthetic-record injection — the send/recv-**opcode** routing + `(PID, size)` payload parse; a live smoke test verifies real end-to-end attribution when elevated with external NIC traffic (skips cleanly otherwise). Requires an elevated token; IP-Helper EStats kept as a fallback |
-| ④ Shell/Registry | Regshot-style snapshot diff (Markdown/structured/history), reversible privacy toggles, DiagTrack disable, context-menu editor, **multi-level cascading submenu builder**, **Autoruns manager** (Run/RunOnce + Startup folders; reversible enable/disable) | — |
+| ④ Shell/Registry | Regshot-style snapshot diff (Markdown/structured/history), reversible privacy toggles, DiagTrack disable, context-menu editor, **multi-level cascading submenu builder**, **Autoruns manager**, **Service & Driver Inspector** (signed/loaded status + an **unquoted-service-path** privesc finder; reversible start/stop/start-type), **Scheduled-Task auditor** (temp-dir/unsigned/encoded-shell/logon-persistence flags + Markdown export), **Startup / Persistence Map** (Run/Startup + auto/boot services + logon/boot tasks unified; reversible enable/disable) | — |
 | ⑤ Auto-Shell | deterministic NL→PowerShell: find/move, kill-by-memory, kill-by-name, CPU affinity, flush DNS, empty recycle bin, clear temp, restart service, largest-files — all behind a confirm gate + a refusal guard for "kill all processes"-style inputs | still deterministic (no LLM) by design |
+| ⑥ Timeline | periodic lightweight snapshots (processes, listening ports, connections, autoruns); **diff any two points** in the session (added·removed), registry-diff-style table; pairs with the persistent audit log | — |
+| ⚙ Plugins v2 | text + widget tools (built-in + user `*.py`), runnable in-app and via `aetheris-cli`; each declares a **permission scope** and carries a **trust** state (built-in / trusted / modified / untrusted, via a hash trust-list); untrusted runs are confirm-gated — **disclosure + provenance, not a sandbox** | — |
 
 Environment-gated items report their status in the UI (e.g. the per-process
 bandwidth line shows why EStats is unavailable) or print an "install X" hint
