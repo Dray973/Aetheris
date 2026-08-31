@@ -232,11 +232,15 @@ class MemProcFSBackend(MemoryBackend):
         except Exception:
             logbus.trace(SRC, "memprocfs not installed; using live backend")
             return None
-        # Candidate devices: an explicit request first, then the FPGA DMA card,
-        # then the live WinPMEM driver. LeechCore fast-fails when no FPGA is
-        # attached, so probing 'fpga' is cheap when the card is absent.
+        # Candidate devices: an explicit request first (so the DMA tab's
+        # get_backend("fpga") drives the card), then the live WinPMEM driver as
+        # the auto fallback. 'fpga' is deliberately NOT in the default auto-probe
+        # because get_backend() runs synchronously at startup (the Memory tab's
+        # scanner) and probing a PCILeech card that isn't attached can stall the
+        # LeechCore/FTDI enumeration -- the DMA tab requests it explicitly, on a
+        # Worker, when the operator asks.
         candidates = [device] if device else []
-        candidates += ["fpga", "pmem"]
+        candidates += ["pmem"]
         for dev in candidates:
             if not dev:
                 continue
