@@ -12,13 +12,19 @@ required.
 """
 from __future__ import annotations
 
-import os
 import math
+import os
 import struct
 
-from PyQt6.QtCore import Qt, QBuffer, QByteArray, QPointF, QRectF
+from PyQt6.QtCore import QBuffer, QByteArray, QPointF, QRectF, Qt
 from PyQt6.QtGui import (
-    QImage, QPainter, QColor, QPen, QBrush, QPolygonF, QRadialGradient,
+    QBrush,
+    QColor,
+    QImage,
+    QPainter,
+    QPen,
+    QPolygonF,
+    QRadialGradient,
 )
 from PyQt6.QtWidgets import QApplication
 
@@ -95,7 +101,7 @@ def build_ico(images: list[QImage]) -> bytes:
     header = struct.pack("<HHH", 0, 1, n)          # reserved, type=icon, count
     entries = b""
     offset = 6 + 16 * n
-    for im, blob in zip(images, blobs):
+    for im, blob in zip(images, blobs, strict=True):   # one blob per image
         w = im.width() if im.width() < 256 else 0   # 0 encodes 256
         h = im.height() if im.height() < 256 else 0
         entries += struct.pack(

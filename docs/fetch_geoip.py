@@ -15,10 +15,9 @@ Use --edition GeoLite2-Country for the smaller country-only DB.
 """
 from __future__ import annotations
 
+import argparse
 import io
 import os
-import sys
-import argparse
 import tarfile
 import urllib.request
 from pathlib import Path

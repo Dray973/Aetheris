@@ -16,16 +16,16 @@ nonzero up/down.
 """
 from __future__ import annotations
 
-import sys
-import time
 import argparse
 import ctypes
+import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from aetheris.network import procbw                       # noqa: E402
-from aetheris.core import privileges                      # noqa: E402
+from aetheris.core import privileges  # noqa: E402
+from aetheris.network import procbw  # noqa: E402
 
 
 def _fmt(bps: float) -> str:

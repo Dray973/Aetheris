@@ -13,10 +13,10 @@ Like the screenshot tool, data-bearing tabs are seeded with representative
 """
 from __future__ import annotations
 
+import argparse
+import math
 import os
 import sys
-import math
-import argparse
 from pathlib import Path
 
 SELFTEST = "--selftest" in sys.argv
@@ -25,12 +25,13 @@ if SELFTEST:
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PyQt6.QtWidgets import QApplication, QTabWidget                 # noqa: E402
-from PyQt6.QtCore import QTimer                                       # noqa: E402
-from aetheris.ui.mainwindow import MainWindow                         # noqa: E402
-from aetheris.forensics.processes import ProcessInfo                  # noqa: E402
-from aetheris.network.connections import Connection                   # noqa: E402
-from aetheris.storage import mft                                      # noqa: E402
+from PyQt6.QtCore import QTimer  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
+
+from aetheris.forensics.processes import ProcessInfo  # noqa: E402
+from aetheris.network.connections import Connection  # noqa: E402
+from aetheris.storage import mft  # noqa: E402
+from aetheris.ui.mainwindow import MainWindow  # noqa: E402
 
 
 def seed(w) -> None:

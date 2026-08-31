@@ -86,6 +86,14 @@ ignore = [
     "B027",  # `close()` is an optional lifecycle hook, not every backend needs it
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# The docs/ screenshot + demo generators and installer helper scripts use a
+# deliberately compact, semicolon-terse style (`idx += 1; ...`). They are
+# dev-only tools, not shipped code, and stay linted for real defects
+# (pyflakes/import-order/bugbear) -- just not the E702 style rule.
+"docs/*" = ["E702"]
+"installer/*" = ["E702"]
+
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true

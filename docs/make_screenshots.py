@@ -28,16 +28,16 @@ sys.path.insert(0, str(REPO))
 OUT = REPO / "docs" / "screenshots"
 OUT.mkdir(parents=True, exist_ok=True)
 
-from PyQt6.QtCore import QEventLoop                            # noqa: E402
-from PyQt6.QtWidgets import QApplication, QTabWidget          # noqa: E402
+from PyQt6.QtCore import QEventLoop  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 
-from aetheris.core import timeline as tl                      # noqa: E402
-from aetheris.core.persistence import PersistenceEntry        # noqa: E402
-from aetheris.core.services import ServiceInfo                # noqa: E402
-from aetheris.forensics.processes import ProcessInfo          # noqa: E402
-from aetheris.network.connections import Connection           # noqa: E402
-from aetheris.storage import mft                              # noqa: E402
-from aetheris.ui.mainwindow import MainWindow                 # noqa: E402
+from aetheris.core import timeline as tl  # noqa: E402
+from aetheris.core.persistence import PersistenceEntry  # noqa: E402
+from aetheris.core.services import ServiceInfo  # noqa: E402
+from aetheris.forensics.processes import ProcessInfo  # noqa: E402
+from aetheris.network.connections import Connection  # noqa: E402
+from aetheris.storage import mft  # noqa: E402
+from aetheris.ui.mainwindow import MainWindow  # noqa: E402
 
 app = QApplication(sys.argv)
 w = MainWindow()
