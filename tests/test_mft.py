@@ -95,3 +95,22 @@ def test_build_tree_aggregates_sizes():
     dir_node = next(c for c in root.children if c.name == "Dir")
     assert dir_node.total_size == 350
     assert dir_node.leaf_count == 2
+
+
+def test_build_tree_preserves_orphans():
+    """Records whose parent wasn't in the (bounded) scan must not vanish -- they
+    land under a synthetic <orphans> node and still count toward the total."""
+    R = mft.MftRecord
+    recs = [
+        R(5, True, True, "\\", 0, 5),
+        R(20, True, False, "lost.bin", 500, 9999),   # parent 9999 not scanned
+        R(21, True, True, "LostDir", 0, 9999),        # dangling parent
+        R(22, True, False, "child.bin", 40, 21),      # child of the orphan dir
+    ]
+    root = mft.build_tree(recs)
+    orphans = next((c for c in root.children if c.name == "<orphans>"), None)
+    assert orphans is not None, "orphaned records were silently dropped"
+    names = {c.name for c in orphans.children}
+    assert {"lost.bin", "LostDir"} <= names
+    # The orphan subtree still aggregates (LostDir -> child.bin).
+    assert root.total_size == 540

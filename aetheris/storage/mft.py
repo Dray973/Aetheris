@@ -298,8 +298,14 @@ def build_tree(records: list[MftRecord]) -> TreeNode:
 
     root = nodes.get(ROOT_INDEX) or TreeNode(ROOT_INDEX, "\\", True, 0)
     nodes[ROOT_INDEX] = root
+    # A bounded scan (max_records) means many records' parents aren't in the set;
+    # without this those files would silently vanish from the tree-map. Collect
+    # every record with a dangling/self-referential parent under one synthetic
+    # node so the totals stay honest.
+    orphans = TreeNode(-1, "<orphans>", True, 0)
 
-    # Link children to parents (skip self-parenting and dangling parents).
+    # Link children to parents; anything whose parent is missing or is itself
+    # goes under <orphans> rather than being dropped.
     for r in records:
         if r.index == ROOT_INDEX:
             continue
@@ -307,6 +313,11 @@ def build_tree(records: list[MftRecord]) -> TreeNode:
         parent = nodes.get(r.parent_index)
         if parent is not None and parent is not node:
             parent.children.append(node)
+        else:
+            orphans.children.append(node)
+
+    if orphans.children:
+        root.children.append(orphans)
 
     # Aggregate total sizes with a post-order walk (visited guard vs. cycles).
     def total(node: TreeNode, seen: set[int]) -> int:
