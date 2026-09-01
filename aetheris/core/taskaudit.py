@@ -24,34 +24,30 @@ from . import dryrun, logbus, safety, signing
 
 SRC = "core.taskaudit"
 
-# Lowercased path fragments that make an action binary worth a second look.
 _BAD_DIRS = ("\\temp\\", "\\tmp\\", "\\downloads\\", "\\appdata\\local\\temp\\",
              "\\users\\public\\", "\\programdata\\")
-# Lowercased tokens that betray an obfuscated / download-and-run shell action.
 _BAD_SHELL = ("-enc", "-encodedcommand", "downloadstring", "downloadfile",
               "iex", "invoke-expression", "frombase64", "-w hidden",
               "-windowstyle hidden", "-nop", "bypass")
-# The strong signals that make a task "suspicious" (logon/boot alone is noisy).
 _STRONG = frozenset({"temp/download/public-dir action",
                      "obfuscated/encoded shell command", "unsigned action binary"})
 
 
 @dataclass
 class TaskInfo:
-    path: str                   # \Microsoft\Windows\...\TaskName
+    path: str
     name: str
     author: str
     description: str
     enabled: bool
     hidden: bool
-    triggers: list[str]         # e.g. ["logon", "boot", "calendar"]
-    actions: list[str]          # e.g. ["C:\\x.exe --arg", "COM:{...}"]
-    action_binaries: list[str]  # parsed executable paths (unresolved)
-    signed: str = "unknown"     # signature of the first action binary
+    triggers: list[str]
+    actions: list[str]
+    action_binaries: list[str]
+    signed: str = "unknown"
     flags: list[str] = field(default_factory=list)
 
 
-# -- pure XML parsing (no OS dependency) -----------------------------------
 def _lname(elem: ET.Element) -> str:
     return elem.tag.rsplit("}", 1)[-1] if isinstance(elem.tag, str) else ""
 
@@ -136,7 +132,6 @@ def resolve_binary(command: str) -> str:
     return os.path.expandvars((command or "").strip().strip('"'))
 
 
-# -- enumeration (Windows) --------------------------------------------------
 def _read_task_xml(path: str) -> str | None:
     """Task XML files are UTF-16; fall back to UTF-8 for hand-placed ones."""
     try:
@@ -179,7 +174,6 @@ def suspicious_tasks(tasks: list[TaskInfo]) -> list[TaskInfo]:
     return [t for t in tasks if is_suspicious(t)]
 
 
-# -- reversible remediation (dry-run + rollback + audit; UI adds confirm) ---
 def _schtasks(*args: str, timeout: int = 30) -> tuple[int, str]:
     import subprocess
     r = subprocess.run(["schtasks", *args], capture_output=True, text=True, timeout=timeout)

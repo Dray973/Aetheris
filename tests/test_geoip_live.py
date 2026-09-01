@@ -62,7 +62,6 @@ def test_real_lookup_returns_a_location():
 
 
 def test_maxmind_test_db_known_ip():
-    # These IPs are fixed fixtures in MaxMind's GeoLite2-City-Test.mmdb.
     if "Test" not in os.path.basename(_DB):
         pytest.skip("not the MaxMind test database")
     r = _resolver_for(_DB)

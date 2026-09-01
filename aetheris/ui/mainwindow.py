@@ -44,7 +44,7 @@ from .theme import QSS
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        audit.wire_to_logbus()   # hash-chain every audit event from here on
+        audit.wire_to_logbus()
         self._audit_path: str | None = None
         if settings().get("audit_persist", True):
             path = audit.session_log_path(str(settings().path.parent))
@@ -64,7 +64,6 @@ class MainWindow(QMainWindow):
         self._restore_settings()
         self._auto_check_updates()
 
-    # -- persistence --------------------------------------------------------
     def _restore_settings(self) -> None:
         s = settings()
         geo = s.get("window_geometry")
@@ -86,7 +85,6 @@ class MainWindow(QMainWindow):
             s.save()
         except Exception:
             pass
-        # Stop the ETW/EStats bandwidth sampler cleanly.
         try:
             sampler = getattr(self.tabs.widget(2), "_ppbw", None)
             if sampler and hasattr(sampler, "stop"):
@@ -94,7 +92,7 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         try:
-            audit.audit.close()          # flush + release the audit file handle
+            audit.audit.close()
         except Exception:
             pass
         super().closeEvent(event)
@@ -143,7 +141,6 @@ class MainWindow(QMainWindow):
         panic_action = QAction("⛔  PANIC / UNDO", self)
         panic_action.triggered.connect(self.trigger_panic)
         tb.addAction(panic_action)
-        # Style the generated button as the red panic control.
         for w in tb.findChildren(QWidget):
             if w.__class__.__name__ == "QToolButton" and "PANIC" in w.text():
                 w.setObjectName("panic")
@@ -176,7 +173,6 @@ class MainWindow(QMainWindow):
                 f"Audit chain BROKEN at record {bad} of {n}.\n\n"
                 "The recorded trail has been altered since it was written.")
 
-    # -- auto-update --------------------------------------------------------
     def _auto_check_updates(self) -> None:
         """Background check on startup; stages a newer version if configured."""
         from ..core import updater
@@ -219,9 +215,6 @@ class MainWindow(QMainWindow):
                                     f"You're up to date (v{__version__}).")
             return
         detail = f"\n\n{info.notes}" if info.notes else ""
-        # A source / pip install can't apply a frozen-exe swap — staging one only
-        # produces a permanent, un-appliable "pending" nag. Tell the user how to
-        # actually update instead of downloading an exe we can never install.
         if not updater.is_frozen():
             QMessageBox.information(
                 self, "Update available",
@@ -239,7 +232,6 @@ class MainWindow(QMainWindow):
         ok, msg = updater.stage(info)
         (QMessageBox.information if ok else QMessageBox.warning)(self, "Updates", msg)
 
-    # -- session report -----------------------------------------------------
     def export_session_report(self) -> None:
         from ..forensics import processes
         from ..network import connections
@@ -282,7 +274,6 @@ class MainWindow(QMainWindow):
         dock.setMinimumHeight(190)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
 
-        # Keep the toolbar rollback-queue counter live.
         logbus.subscribe(lambda _ev: self.pending_lbl.setText(
             f"rollback queue: {len(safety.ledger.pending())}  "))
 
@@ -305,7 +296,6 @@ class MainWindow(QMainWindow):
             logbus.warn("ui.main",
                         "Not elevated — memory, MFT, and firewall features are limited.")
 
-    # -- panic --------------------------------------------------------------
     def trigger_panic(self) -> None:
         pending = safety.ledger.pending()
         if not pending:
@@ -340,4 +330,4 @@ class MainWindow(QMainWindow):
         box.resize(640, 360)
         box.setStyleSheet(QSS)
         box.show()
-        self._panic_report = box  # keep a reference so it isn't GC'd
+        self._panic_report = box

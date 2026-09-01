@@ -30,7 +30,7 @@ def test_trust_lifecycle(tmp_path, monkeypatch):
     assert plugins.trust_file(str(f)) is True
     assert plugins.trust_status(str(f)) == "trusted"
     f.write_text("PLUGIN = None\n# tampered\n", encoding="utf-8")
-    assert plugins.trust_status(str(f)) == "modified"     # hash no longer matches
+    assert plugins.trust_status(str(f)) == "modified"
     assert plugins.trust_status("builtin:top_memory") == "built-in"
 
 
@@ -55,7 +55,7 @@ def test_widget_plugin_discovered_with_kind():
     ps = {p.name: p for p in plugins.discover()}
     assert "system-gauges" in ps
     assert ps["system-gauges"].kind == "widget"
-    assert ps["system-gauges"].run is None      # GUI-only
+    assert ps["system-gauges"].run is None
 
 
 def test_gui_only_plugin_run_is_graceful():

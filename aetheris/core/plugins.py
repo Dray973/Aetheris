@@ -43,7 +43,6 @@ from .settings import config_dir
 
 SRC = "core.plugins"
 
-# The scopes a plugin may declare in a module-level PERMISSIONS list.
 KNOWN_SCOPES = ("reads-processes", "reads-connections", "reads-registry",
                 "runs-powershell", "writes-registry", "network", "filesystem")
 
@@ -75,11 +74,11 @@ class PluginContext:
 class Plugin:
     name: str
     description: str
-    run: Callable[[PluginContext], str] | None = None   # text tool (headless-safe)
-    widget: Callable[[], object] | None = None          # GUI tool (returns a QWidget)
+    run: Callable[[PluginContext], str] | None = None
+    widget: Callable[[], object] | None = None
     source: str = ""
-    permissions: list[str] = field(default_factory=list)   # declared scopes
-    trust: str = "unknown"                                  # built-in/trusted/modified/untrusted
+    permissions: list[str] = field(default_factory=list)
+    trust: str = "unknown"
 
     @property
     def kind(self) -> str:
@@ -120,13 +119,12 @@ def _extract(module: Any, source: str, trust: str) -> list[Plugin]:
         if isinstance(p, Plugin) and (callable(p.run) or callable(p.widget)):
             p.source = source
             p.trust = trust
-            if not p.permissions:          # module PERMISSIONS applies to its plugins
+            if not p.permissions:
                 p.permissions = list(perms)
             out.append(p)
     return out
 
 
-# -- provenance / trust list (hash-based, tamper-evident) ------------------
 def _trust_path() -> Path:
     return user_dir() / "trusted.json"
 
@@ -173,8 +171,6 @@ def trust_file(path: str) -> bool:
         return False
 
 
-# Static fallback so built-ins still load in a frozen exe, where
-# pkgutil.iter_modules over a package can come back empty.
 _BUILTIN_FALLBACK = ["top_memory", "public_connections",
                      "listening_ports", "system_gauges"]
 
@@ -188,7 +184,7 @@ def _discover_builtin() -> list[Plugin]:
     names = [m.name for m in pkgutil.iter_modules(pkg.__path__)
              if not m.name.startswith("_")]
     if not names:
-        names = _BUILTIN_FALLBACK          # frozen-exe fallback
+        names = _BUILTIN_FALLBACK
     for name in names:
         try:
             mod = importlib.import_module(f"aetheris.plugins.{name}")

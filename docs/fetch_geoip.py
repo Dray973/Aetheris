@@ -52,7 +52,6 @@ def main() -> int:
         print("Check the license key and your network connection.")
         return 1
 
-    # The archive contains <edition>_<date>/<edition>.mmdb — extract just that.
     member_name = f"{args.edition}.mmdb"
     try:
         with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:

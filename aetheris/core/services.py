@@ -35,7 +35,6 @@ else:  # pragma: no cover
 
 _SERVICES_KEY = r"SYSTEM\CurrentControlSet\Services"
 _START_TYPES = {0: "boot", 1: "system", 2: "auto", 3: "manual", 4: "disabled"}
-# Service Type bitmask: 0x1 kernel driver, 0x2 fs driver, 0x10/0x20 win32 service.
 _DRIVER_TYPES = (0x1, 0x2)
 
 
@@ -43,17 +42,16 @@ _DRIVER_TYPES = (0x1, 0x2)
 class ServiceInfo:
     name: str
     display_name: str
-    image_path: str            # raw ImagePath / binpath
-    binary: str                # parsed, resolved executable path
-    start_type: str            # boot/system/auto/manual/disabled/unknown
-    kind: str                  # "service" | "driver"
-    account: str = ""          # ObjectName (LocalSystem, ...)
-    state: str = "unknown"     # running/stopped/loaded/... (best effort)
-    signed: str = "unknown"    # signed/unsigned/unknown
+    image_path: str
+    binary: str
+    start_type: str
+    kind: str
+    account: str = ""
+    state: str = "unknown"
+    signed: str = "unknown"
     unquoted_path: bool = False
 
 
-# -- pure helpers (no OS dependency) ---------------------------------------
 def parse_binary(image_path: str) -> str:
     """Extract the executable path from a raw ImagePath (drops arguments)."""
     p = (image_path or "").strip()
@@ -94,7 +92,7 @@ def normalize_start(text: str) -> str:
     """Fold psutil's start-type strings into our vocabulary (auto/manual/...)."""
     s = (text or "").lower()
     if s.startswith("auto"):
-        return "auto"                          # "automatic", "automatic delayed"
+        return "auto"
     if s in ("manual", "demand"):
         return "manual"
     if s == "disabled":
@@ -109,21 +107,20 @@ def has_unquoted_path_vuln(image_path: str, kind: str) -> bool:
     (Reports the candidate; it does not check directory ACLs, so treat a hit as
     "worth investigating" rather than "definitely exploitable".)"""
     if kind != "service":
-        return False                       # drivers load by a different mechanism
+        return False
     p = (image_path or "").strip()
     if not p or p.startswith('"'):
-        return False                       # quoted path is safe
+        return False
     low = p.lower()
     idx = low.find(".exe")
     if idx == -1:
         return False
     exe_path = p[:idx + 4]
     if " " not in exe_path:
-        return False                       # no space in the executable path
-    return bool(re.match(r"^[a-zA-Z]:\\", exe_path))   # a real drive-letter path
+        return False
+    return bool(re.match(r"^[a-zA-Z]:\\", exe_path))
 
 
-# -- enumeration (Windows) --------------------------------------------------
 def _loaded_driver_basenames() -> set[str]:
     """Base names of currently-loaded kernel drivers (psapi), best effort."""
     names: set[str] = set()
@@ -241,8 +238,6 @@ def unquoted_path_issues(services: list[ServiceInfo]) -> list[ServiceInfo]:
     return [s for s in services if s.unquoted_path]
 
 
-# -- reversible control (dry-run + rollback + audit; UI adds the confirm) ---
-# sc.exe start-type tokens keyed by our labels.
 _SC_START = {"boot": "boot", "system": "system", "auto": "auto",
              "manual": "demand", "disabled": "disabled"}
 

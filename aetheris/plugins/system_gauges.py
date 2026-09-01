@@ -5,8 +5,6 @@ PERMISSIONS = ["reads-processes"]
 
 
 def _make_widget():
-    # Qt is imported lazily here so the headless CLI can discover this plugin
-    # without pulling in PyQt6.
     import psutil
     from PyQt6.QtCore import QTimer
     from PyQt6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
@@ -25,7 +23,7 @@ def _make_widget():
             self.cores_lbl = QLabel("", objectName="subtle")
             v.addWidget(self.cores_lbl)
             v.addStretch(1)
-            psutil.cpu_percent(interval=None, percpu=True)   # prime
+            psutil.cpu_percent(interval=None, percpu=True)
             self._t = QTimer(self)
             self._t.timeout.connect(self._tick)
             self._t.start(1000)

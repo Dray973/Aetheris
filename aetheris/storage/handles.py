@@ -59,7 +59,7 @@ class UNICODE_STRING(ctypes.Structure):
     ]
 
 
-_HANDLES_OFFSET = 2 * ctypes.sizeof(ctypes.c_void_p)   # NumberOfHandles + Reserved
+_HANDLES_OFFSET = 2 * ctypes.sizeof(ctypes.c_void_p)
 
 
 def _drive_device_map() -> dict[str, str]:
@@ -117,7 +117,7 @@ def enumerate_handles(pids: set[int] | None = None) -> list[HandleEntry]:
     arr_type = SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX * num
     arr = arr_type.from_address(base + _HANDLES_OFFSET)
     out = []
-    for e in arr:                              # copy values; buf is freed on return
+    for e in arr:
         pid = int(e.UniqueProcessId or 0)
         if pids is not None and pid not in pids:
             continue
@@ -139,8 +139,6 @@ def _query_object_name(dup) -> str | None:
     us = UNICODE_STRING.from_buffer_copy(nbuf.raw[:ctypes.sizeof(UNICODE_STRING)])
     if not us.Buffer or us.Length == 0 or us.Length > size:
         return None
-    # The name buffer points *inside* nbuf; validate the range before reading so
-    # a malformed entry can never cause a wild out-of-bounds read (segfault).
     base = ctypes.addressof(nbuf)
     if not (base <= us.Buffer <= base + size - us.Length):
         return None
@@ -173,7 +171,6 @@ def _handle_name(hproc, handle_value: int, timeout: float = 0.15) -> str | None:
     t.start()
     t.join(timeout)
     if not box["done"]:
-        # Stuck query: leak the dup (safer than closing under a stuck thread).
         logbus.trace(SRC, f"name query timed out for handle 0x{handle_value:x}")
         return None
     W.kernel32.CloseHandle(dup)
@@ -192,7 +189,7 @@ def find_file_handles(path: str, pids: set[int]) -> list[tuple[int, int]]:
     try:
         for e in enumerate_handles(pids):
             if e.access == W.GRANTED_ACCESS_HANG:
-                continue                      # skip hang-prone synchronous handles
+                continue
             if e.pid not in opened:
                 opened[e.pid] = W.kernel32.OpenProcess(W.PROCESS_DUP_HANDLE, False, e.pid)
             hproc = opened[e.pid]
@@ -226,10 +223,6 @@ def close_handle_in_process(pid: int, handle_value: int) -> tuple[bool, str]:
         W.kernel32.CloseHandle(hproc)
 
 
-# --------------------------------------------------------------------------
-# Restart Manager — robust "who has this file open" (replaces psutil.open_files,
-# which can hit a native access violation while enumerating some handles).
-# --------------------------------------------------------------------------
 class _FILETIME(ctypes.Structure):
     _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
 

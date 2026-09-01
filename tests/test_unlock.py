@@ -23,7 +23,7 @@ def test_obliterate_honors_dry_run(tmp_path):
     with dryrun.active():
         ok, msg = unlock.obliterate(str(f), confirm=True)
     assert ok and "dry-run" in msg.lower()
-    assert f.exists()                                   # simulated, not deleted
+    assert f.exists()
 
 
 def test_critical_processes_cover_the_essentials():
@@ -35,7 +35,7 @@ def test_critical_processes_cover_the_essentials():
 def test_is_protected_path_boundary_and_coverage(monkeypatch):
     monkeypatch.setattr(unlock, "PROTECTED_ROOTS", ("c:\\windows", "c:\\program files"))
     assert unlock.is_protected_path(r"C:\Windows\System32\x.dll")
-    assert unlock.is_protected_path("C:\\Windows")           # the root itself
+    assert unlock.is_protected_path("C:\\Windows")
     assert unlock.is_protected_path(r"C:\Program Files\App\x.exe")
-    assert not unlock.is_protected_path(r"C:\WindowsApps\evil.exe")   # boundary, not a child
+    assert not unlock.is_protected_path(r"C:\WindowsApps\evil.exe")
     assert not unlock.is_protected_path(r"C:\Users\me\Downloads\x.txt")

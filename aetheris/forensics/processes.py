@@ -34,18 +34,17 @@ class ProcessInfo:
     username: str
     exe: str
     cpu_percent: float
-    mem_rss: int              # bytes
+    mem_rss: int
     num_threads: int
     status: str
-    dep: str = "unknown"      # on / off / unknown
-    aslr: str = "unknown"     # on / off / unknown
+    dep: str = "unknown"
+    aslr: str = "unknown"
     signature: str = "unchecked"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-# --- Mitigation policy (best effort) --------------------------------------
 class _PROCESS_MITIGATION_DEP_POLICY(ctypes.Structure):
     _fields_ = [("Flags", wintypes.DWORD)]
 
@@ -69,9 +68,6 @@ def _query_mitigations(pid: int) -> tuple[str, str]:
     try:
         dep = aslr = "unknown"
         try:
-            # DEP is permanently on for 64-bit processes, and
-            # GetProcessMitigationPolicy(ProcessDEPPolicy) is unsupported for
-            # them (fails -> "unknown"). It only reports for 32-bit processes.
             dep_pol = _PROCESS_MITIGATION_DEP_POLICY()
             if W.kernel32.GetProcessMitigationPolicy(
                 h, _ProcessDEPPolicy, ctypes.byref(dep_pol), ctypes.sizeof(dep_pol)
@@ -84,7 +80,6 @@ def _query_mitigations(pid: int) -> tuple[str, str]:
             if W.kernel32.GetProcessMitigationPolicy(
                 h, _ProcessASLRPolicy, ctypes.byref(aslr_pol), ctypes.sizeof(aslr_pol)
             ):
-                # bit0 = EnableBottomUpRandomization
                 aslr = "on" if (aslr_pol.Flags & 0x1) else "off"
         except Exception:
             pass

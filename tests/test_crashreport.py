@@ -17,7 +17,7 @@ def test_write_report_scrubs_account_name(tmp_path, monkeypatch):
     text = Path(path).read_text(encoding="utf-8")
     assert "ValueError" in text and "boom" in text
     assert "crash report" in text.lower()
-    assert "alice" not in text                       # account name redacted
+    assert "alice" not in text
     assert "<USER>" in text
 
 
@@ -36,7 +36,7 @@ def test_install_is_idempotent_and_hooks_excepthook():
         crashreport.install()
         assert sys.excepthook is not prev
         after = sys.excepthook
-        crashreport.install()                        # idempotent
+        crashreport.install()
         assert sys.excepthook is after
     finally:
         sys.excepthook = prev

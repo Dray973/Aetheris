@@ -42,7 +42,7 @@ class MftRecord:
     in_use: bool
     is_directory: bool
     name: str
-    size: int          # logical size from $DATA, best effort
+    size: int
     parent_index: int
 
 
@@ -72,7 +72,7 @@ def read_boot_info(volume: str = r"\\.\C:") -> BootInfo:
     if raw_rec >= 0:
         record_size = raw_rec * spc * bps
     else:
-        record_size = 1 << (-raw_rec)  # 2^|raw_rec|
+        record_size = 1 << (-raw_rec)
     return BootInfo(bps, spc, bps * spc, mft_cluster, record_size)
 
 
@@ -86,24 +86,21 @@ def _apply_fixups(record: bytearray, bps: int) -> bool:
     usa_cnt = struct.unpack_from("<H", record, 0x06)[0]
     if usa_cnt == 0:
         return True
-    if usa_off + usa_cnt * 2 > n:      # USA must fit inside the record
+    if usa_off + usa_cnt * 2 > n:
         return False
     usn = record[usa_off:usa_off + 2]
     for i in range(1, usa_cnt):
         sector_end = i * bps - 2
-        if sector_end < 0 or sector_end + 2 > n:   # sector tail out of bounds
+        if sector_end < 0 or sector_end + 2 > n:
             return False
         fix = record[usa_off + i * 2: usa_off + i * 2 + 2]
         if record[sector_end:sector_end + 2] != usn:
-            return False  # torn write / corrupt record
+            return False
         record[sector_end:sector_end + 2] = fix
     return True
 
 
 def _parse_record(record: bytes, index: int) -> MftRecord | None:
-    # Every field read below is bounds-checked: a corrupt or truncated record
-    # (attacker-controllable on-disk bytes) must yield None or a best-effort
-    # record, never an exception.
     n = len(record)
     if n < 0x18 or record[0:4] != FILE_SIGNATURE:
         return None
@@ -117,26 +114,25 @@ def _parse_record(record: bytes, index: int) -> MftRecord | None:
     parent_index = 0
 
     off = attr_off
-    while off + 8 <= n:                       # need 8 bytes for type + length
+    while off + 8 <= n:
         attr_type = struct.unpack_from("<I", record, off)[0]
         if attr_type == ATTR_END:
             break
         attr_len = struct.unpack_from("<I", record, off + 4)[0]
-        if attr_len < 16 or off + attr_len > n:   # min header is 16 bytes
+        if attr_len < 16 or off + attr_len > n:
             break
         non_resident = record[off + 8]
 
         if attr_type == ATTR_FILE_NAME and non_resident == 0 and off + 0x16 <= n:
             content_off = struct.unpack_from("<H", record, off + 0x14)[0]
             base = off + content_off
-            if base + 0x42 <= n:              # parent ref .. name-length .. name
+            if base + 0x42 <= n:
                 parent_ref = struct.unpack_from("<Q", record, base)[0]
                 parent_index = parent_ref & 0x0000FFFFFFFFFFFF
                 name_len = record[base + 0x40]
                 namespace = record[base + 0x41]
                 cand = record[base + 0x42: base + 0x42 + name_len * 2].decode(
-                    "utf-16-le", errors="replace")   # slice self-clamps to n
-                # Prefer Win32 namespace names (1/3) over DOS 8.3 (2).
+                    "utf-16-le", errors="replace")
                 if namespace != 2 or not name:
                     name = cand
 
@@ -144,7 +140,6 @@ def _parse_record(record: bytes, index: int) -> MftRecord | None:
             if non_resident == 0 and off + 0x14 <= n:
                 size = struct.unpack_from("<I", record, off + 0x10)[0]
             elif non_resident == 1 and off + 0x38 <= n:
-                # real size lives at +0x30 in the non-resident header
                 size = struct.unpack_from("<Q", record, off + 0x30)[0]
 
         off += attr_len
@@ -173,7 +168,7 @@ def _parse_run_list(buf: bytes | bytearray, pos: int, cluster_size: int) -> list
         run_len = int.from_bytes(buf[pos:pos + len_bytes], "little")
         pos += len_bytes
         if off_bytes == 0:
-            continue  # sparse extent — no physical clusters
+            continue
         run_off = int.from_bytes(buf[pos:pos + off_bytes], "little", signed=True)
         pos += off_bytes
         lcn += run_off
@@ -199,7 +194,7 @@ def _mft_extents(fh: Any, boot: BootInfo) -> list[tuple[int, int]]:
         attr_len = struct.unpack_from("<I", buf, off + 4)[0]
         if attr_len == 0 or off + attr_len > n:
             break
-        if attr_type == ATTR_DATA and buf[off + 8] == 1:  # non-resident $DATA
+        if attr_type == ATTR_DATA and buf[off + 8] == 1:
             run_off = struct.unpack_from("<H", buf, off + 0x20)[0]
             extents = _parse_run_list(buf, off + run_off, boot.cluster_size)
             if extents:
@@ -208,7 +203,6 @@ def _mft_extents(fh: Any, boot: BootInfo) -> list[tuple[int, int]]:
                                   f"{total // boot.record_size} record slots")
                 return extents
         off += attr_len
-    # Fallback: treat the first cluster run as contiguous.
     logbus.warn(SRC, "could not decode $MFT run-list; using contiguous fallback")
     return [(boot.mft_offset, boot.record_size * 65536)]
 
@@ -226,9 +220,9 @@ def parse_volume(volume: str = r"\\.\C:", max_records: int = 20000) -> Iterator[
         f"rec={boot.record_size} mft@cluster {boot.mft_cluster}",
     )
     rec_size = boot.record_size
-    block_records = 256                      # 256 KiB reads, sector-aligned
+    block_records = 256
     block_bytes = block_records * rec_size
-    slot = 0                                 # global MFT record number
+    slot = 0
     yielded = 0
 
     with open(volume, "rb", buffering=0) as fh:
@@ -266,10 +260,7 @@ def parse_volume(volume: str = r"\\.\C:", max_records: int = 20000) -> Iterator[
     logbus.trace(SRC, f"parsed {yielded} named records across {slot} slots")
 
 
-# --------------------------------------------------------------------------
-# Directory-tree reconstruction (for the space-utilization tree-map)
-# --------------------------------------------------------------------------
-ROOT_INDEX = 5  # NTFS root directory "." is always MFT record 5
+ROOT_INDEX = 5
 
 
 @dataclass
@@ -298,14 +289,8 @@ def build_tree(records: list[MftRecord]) -> TreeNode:
 
     root = nodes.get(ROOT_INDEX) or TreeNode(ROOT_INDEX, "\\", True, 0)
     nodes[ROOT_INDEX] = root
-    # A bounded scan (max_records) means many records' parents aren't in the set;
-    # without this those files would silently vanish from the tree-map. Collect
-    # every record with a dangling/self-referential parent under one synthetic
-    # node so the totals stay honest.
     orphans = TreeNode(-1, "<orphans>", True, 0)
 
-    # Link children to parents; anything whose parent is missing or is itself
-    # goes under <orphans> rather than being dropped.
     for r in records:
         if r.index == ROOT_INDEX:
             continue
@@ -319,7 +304,6 @@ def build_tree(records: list[MftRecord]) -> TreeNode:
     if orphans.children:
         root.children.append(orphans)
 
-    # Aggregate total sizes with a post-order walk (visited guard vs. cycles).
     def total(node: TreeNode, seen: set[int]) -> int:
         if node.index in seen:
             return 0

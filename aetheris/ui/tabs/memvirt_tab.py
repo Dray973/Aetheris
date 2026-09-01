@@ -69,7 +69,6 @@ class MemVirtWidget(QWidget):
 
         split = QSplitter(Qt.Orientation.Horizontal)
 
-        # -- process list --
         self.proc_table = QTableWidget(0, 5)
         self.proc_table.setHorizontalHeaderLabels(["PID", "Name", "PPID", "Hidden", "Path"])
         self.proc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -78,7 +77,6 @@ class MemVirtWidget(QWidget):
         self.proc_table.itemSelectionChanged.connect(self._load_map)
         split.addWidget(self.proc_table)
 
-        # -- right side: region map + hex --
         right = QSplitter(Qt.Orientation.Vertical)
         self.region_table = QTableWidget(0, 5)
         self.region_table.setHorizontalHeaderLabels(["Base", "Size", "State", "Protect", "Type"])
@@ -122,7 +120,6 @@ class MemVirtWidget(QWidget):
         self.count = QLabel("", objectName="subtle")
         root.addWidget(self.count)
 
-    # -- process list -------------------------------------------------------
     def rescan(self) -> None:
         self._run(self._backend.list_processes, self._show_procs)
 
@@ -152,7 +149,6 @@ class MemVirtWidget(QWidget):
             return None
         return int(self.proc_table.item(row, 0).text())
 
-    # -- region map ---------------------------------------------------------
     def _load_map(self) -> None:
         pid = self._selected_pid()
         if pid is None:
@@ -168,7 +164,7 @@ class MemVirtWidget(QWidget):
             for c, v in enumerate([f"0x{r.base:012x}", _human(r.size),
                                    r.state, r.protect, r.type]):
                 item = QTableWidgetItem(v)
-                if "x" in r.protect:                       # executable → highlight
+                if "x" in r.protect:
                     item.setForeground(Qt.GlobalColor.cyan)
                 self.region_table.setItem(i, c, item)
         logbus.trace("ui.memvirt", f"{len(regions)} regions, {_human(total)} mapped")
@@ -181,7 +177,6 @@ class MemVirtWidget(QWidget):
             self.size.setValue(min(r.size, 4096) if r.size else 256)
             self._read_virtual()
 
-    # -- hex read -----------------------------------------------------------
     def _parse_addr(self) -> int | None:
         try:
             return int(self.addr.text().strip(), 16)
@@ -209,7 +204,6 @@ class MemVirtWidget(QWidget):
             return
         self.hexview.setPlainText(memvirt.format_hex(data, addr))
 
-    # -- helpers ------------------------------------------------------------
     def _run(self, fn, on_done) -> None:
         if self._worker and self._worker.isRunning():
             return

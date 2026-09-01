@@ -35,8 +35,6 @@ def test_cli_scheduled_capture_writes_timestamped_files(tmp_path):
 
 
 def test_cli_rapid_captures_are_all_distinct(tmp_path):
-    # Five same-second captures (interval 0) must produce five distinct,
-    # non-empty files -- no collisions even when the wall clock doesn't tick.
     n = 5
     out = tmp_path / "cap.md"
     rc = cli.main(["--format", "md", "--out", str(out),
@@ -44,5 +42,5 @@ def test_cli_rapid_captures_are_all_distinct(tmp_path):
     assert rc == 0
     files = list(tmp_path.glob("cap-*.md"))
     assert len(files) == n
-    assert len({f.name for f in files}) == n            # all names unique
-    assert all(f.stat().st_size > 0 for f in files)     # all captured content
+    assert len({f.name for f in files}) == n
+    assert all(f.stat().st_size > 0 for f in files)

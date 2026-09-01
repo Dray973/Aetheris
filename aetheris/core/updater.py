@@ -55,7 +55,6 @@ class UpdateInfo:
     sha256: str = ""
 
 
-# --- version comparison (pure) --------------------------------------------
 def parse_version(s: str) -> tuple[int, ...]:
     nums = [int(x) for x in re.findall(r"\d+", str(s))[:4]]
     return tuple(nums) or (0,)
@@ -65,7 +64,6 @@ def is_newer(remote: str, local: str) -> bool:
     return parse_version(remote) > parse_version(local)
 
 
-# --- environment ----------------------------------------------------------
 def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
@@ -81,7 +79,6 @@ def staging_path() -> Path:
     return config_dir() / "update" / "AetherisQuantumCore.exe.new"
 
 
-# --- check + download -----------------------------------------------------
 GITHUB_PREFIX = "github:"
 
 
@@ -111,7 +108,6 @@ def _check_github(owner_repo: str, current: str) -> UpdateInfo | None:
     tag = str(data.get("tag_name", "")).strip()
     if not tag or not is_newer(tag, current):
         return None
-    # Prefer the standalone exe asset (not the setup.exe installer).
     exe_url = ""
     for asset in data.get("assets", []):
         name = str(asset.get("name", "")).lower()
@@ -202,7 +198,6 @@ def _discard_pending(reason: str) -> None:
     logbus.trace(SRC, f"discarded staged update ({reason})")
 
 
-# --- apply (next launch) --------------------------------------------------
 def apply_pending() -> bool:
     """
     If a staged update exists, apply it. For the frozen exe this spawns a small
@@ -215,10 +210,6 @@ def apply_pending() -> bool:
     exe = current_exe()
     staged = staging_path()
     if exe is None:
-        # Source / pip install: there is no exe to swap, so a staged frozen exe
-        # can never be applied here. Discard it (and the pending flag) instead
-        # of leaving it — otherwise the UI claims "update staged, applies on next
-        # launch" forever. Source installs update via the installer or git.
         _discard_pending("not a frozen exe; update via the installer or git")
         return False
     try:

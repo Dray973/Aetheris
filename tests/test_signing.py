@@ -20,8 +20,8 @@ def test_none_and_missing_are_undeterminable(tmp_path):
 
 
 def test_embedded_and_catalog_signed_os_binaries_verify():
-    assert signing.is_signed(r"C:\Windows\System32\kernel32.dll") is True   # embedded
-    assert signing.is_signed(r"C:\Windows\System32\notepad.exe") is True    # catalog
+    assert signing.is_signed(r"C:\Windows\System32\kernel32.dll") is True
+    assert signing.is_signed(r"C:\Windows\System32\notepad.exe") is True
 
 
 def test_handmade_file_is_unsigned(tmp_path):

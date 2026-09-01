@@ -29,7 +29,6 @@ def test_nested_branches_two_levels():
 
 
 def test_command_may_contain_pipes():
-    # Only the first '|' separates label from command.
     item = parse_menu_spec("Grep | findstr x | more")[0]
     assert item.label == "Grep"
     assert item.command == "findstr x | more"

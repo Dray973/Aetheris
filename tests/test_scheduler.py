@@ -8,7 +8,7 @@ def test_capture_command_uses_cli_and_output():
     cmd = scheduler.capture_command(r"C:\out\report.html", "html")
     assert "aetheris.cli" in cmd
     assert "report.html" in cmd
-    assert cmd.strip().endswith("report")     # the CLI subcommand
+    assert cmd.strip().endswith("report")
     assert "--format html" in cmd
 
 
@@ -16,7 +16,7 @@ def test_capture_command_uses_exe_cli_dispatch_when_frozen(monkeypatch):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", r"C:\App\AetherisQuantumCore.exe")
     cmd = scheduler.capture_command(r"C:\out\r.html", "html")
-    assert '"C:\\App\\AetherisQuantumCore.exe" cli ' in cmd   # frozen dispatch path
+    assert '"C:\\App\\AetherisQuantumCore.exe" cli ' in cmd
     assert "-m aetheris.cli" not in cmd
     assert cmd.strip().endswith("report")
 

@@ -36,9 +36,6 @@ else:  # pragma: no cover
     _HIVES = {}
 
 
-# --------------------------------------------------------------------------
-# Differential tracker
-# --------------------------------------------------------------------------
 def snapshot_tree(root: str, subkey: str, max_depth: int = 6) -> dict[str, dict[str, Any]]:
     """
     Recursively capture value state as {key_path: {value_name: (data, type)}}.
@@ -133,8 +130,6 @@ def diff_trees(before: dict[str, dict[str, Any]],
         flat: dict[str, Any] = {}
         for key, values in tree.items():
             for vname, vdata in values.items():
-                # Normalize tuples/lists so JSON-loaded snapshots (lists) compare
-                # equal to freshly-captured ones (tuples).
                 flat[f"{key}::{vname or '(default)'}"] = (
                     tuple(vdata) if isinstance(vdata, list) else vdata)
         return flat
@@ -167,9 +162,6 @@ def load_snapshot(path: str) -> dict[str, Any]:
         return data
 
 
-# --------------------------------------------------------------------------
-# Snapshot history (auto-saved, timestamped, for point-in-time diffing)
-# --------------------------------------------------------------------------
 @dataclass
 class HistoryEntry:
     path: str
@@ -235,15 +227,12 @@ def load_history(path: str) -> dict[str, Any]:
         return tree
 
 
-# --------------------------------------------------------------------------
-# Reversible value writes + privacy toggles
-# --------------------------------------------------------------------------
 def _read_value(root: str, subkey: str, name: str) -> Any:
     hive = _HIVES[root.upper()]
     try:
         key = winreg.OpenKey(hive, subkey, 0, winreg.KEY_READ)
         try:
-            return winreg.QueryValueEx(key, name)  # (data, type)
+            return winreg.QueryValueEx(key, name)
         finally:
             winreg.CloseKey(key)
     except OSError:
@@ -286,7 +275,6 @@ def set_value(root: str, subkey: str, name: str, data: Any,
     return True, "value set"
 
 
-# name -> (root, subkey, value_name, data_to_set, human_label)
 PRIVACY_TOGGLES = {
     "telemetry": ("HKLM", r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
                   "AllowTelemetry", 0, "Disable Windows telemetry (AllowTelemetry=0)"),
@@ -331,9 +319,6 @@ def disable_diagtrack_service() -> tuple[bool, str]:
         return False, str(exc)
 
 
-# --------------------------------------------------------------------------
-# Context-menu (shell) editor
-# --------------------------------------------------------------------------
 def read_context_handlers(scope: str = r"*\shellex\ContextMenuHandlers") -> list[str]:
     if winreg is None:
         return []
@@ -383,13 +368,10 @@ def add_context_command(label: str, command: str,
         return False, str(exc)
 
 
-# --------------------------------------------------------------------------
-# Cascading (multi-level) context submenus
-# --------------------------------------------------------------------------
 @dataclass
 class MenuItem:
     label: str
-    command: str | None = None                 # leaf command (ignored if children)
+    command: str | None = None
     children: list[MenuItem] = field(default_factory=list)
 
     @property
@@ -410,7 +392,6 @@ def parse_menu_spec(text: str) -> list[MenuItem]:
             SHA-256 this file | powershell.exe -Command "Get-FileHash '%1'"
     """
     roots: list[MenuItem] = []
-    # stack of (depth, item); children attach to the nearest shallower item.
     stack: list[tuple[int, MenuItem]] = []
     for raw in text.splitlines():
         if not raw.strip():

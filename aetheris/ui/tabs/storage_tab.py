@@ -59,7 +59,6 @@ class StorageTab(QWidget):
         tabs.addTab(self._oblit_panel(), "File Obliterator")
         root.addWidget(tabs)
 
-    # -- MFT ----------------------------------------------------------------
     def _mft_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -84,14 +83,12 @@ class StorageTab(QWidget):
 
         views = QTabWidget()
 
-        # -- records table --
         self.mft_table = QTableWidget(0, 5)
         self.mft_table.setHorizontalHeaderLabels(["#", "Name", "Size", "Dir?", "Parent"])
         self.mft_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.mft_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         views.addTab(self.mft_table, "Records")
 
-        # -- tree-map --
         tm_page = QWidget()
         tmv = QVBoxLayout(tm_page)
         tmbar = QHBoxLayout()
@@ -141,9 +138,9 @@ class StorageTab(QWidget):
     def _build_treemap(self) -> None:
         if not self._mft_records:
             return
-        self.tm_build.setEnabled(False)                 # busy: tree build is CPU-heavy
+        self.tm_build.setEnabled(False)
         self._run(mft.build_tree, self._show_treemap, self._mft_records)
-        if self._worker:                                # re-enable on success *or* error
+        if self._worker:
             self._worker.finished.connect(lambda: self.tm_build.setEnabled(True))
 
     def _show_treemap(self, root) -> None:
@@ -151,7 +148,6 @@ class StorageTab(QWidget):
         self._toast(True, f"tree-map: {_human(root.total_size)} across "
                           f"{len(root.children)} top-level entries")
 
-    # -- duplicates / ghosts ------------------------------------------------
     def _dupe_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -215,7 +211,6 @@ class StorageTab(QWidget):
             lines.append(f"[{g.kind}] {g.path}{note}")
         self.dupe_out.setPlainText("\n".join(lines))
 
-    # -- obliterator --------------------------------------------------------
     def _oblit_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -260,7 +255,7 @@ class StorageTab(QWidget):
         path = self.oblit_path.text().strip()
         if not path:
             return
-        self.oblit_out.setPlainText("finding lockers…")     # Restart-Manager can block
+        self.oblit_out.setPlainText("finding lockers…")
         self._run(unlock.find_lockers, self._show_lockers, path)
 
     def _show_lockers(self, lockers) -> None:
@@ -316,7 +311,7 @@ class StorageTab(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
-        self.oblit_out.setPlainText("closing handles…")     # busy: table walk can be slow
+        self.oblit_out.setPlainText("closing handles…")
         self._run(unlock.strip_handles, self._show_strip, path)
 
     def _show_strip(self, results) -> None:
@@ -329,7 +324,6 @@ class StorageTab(QWidget):
         closed = sum(1 for _p, _h, ok, _n in results if ok)
         self._toast(True, f"closed {closed}/{len(results)} handle(s)")
 
-    # -- helpers ------------------------------------------------------------
     def _pick_dir(self, target: QLineEdit) -> None:
         d = QFileDialog.getExistingDirectory(self, "Select folder")
         if d:

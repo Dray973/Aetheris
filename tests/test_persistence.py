@@ -40,6 +40,6 @@ def test_enumerate_all_merges_sources():
     entries = persistence.enumerate_all()
     assert entries
     sources = {e.source for e in entries}
-    assert "Service" in sources                 # a real box always has auto services
+    assert "Service" in sources
     for e in entries:
         assert e.source in ("Run", "Startup", "Service", "Task") and e.name

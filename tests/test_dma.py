@@ -52,7 +52,6 @@ def test_write_changes_bytes_and_is_reversible(ledger):
     ok, msg = dma.physical_write(be, 4, b"\xde\xad\xbe\xef")
     assert ok, msg
     assert be.mem[4:8] == b"\xde\xad\xbe\xef"
-    # An undo was registered; running PANIC restores the original bytes.
     assert ledger.pending()
     ledger.panic()
     assert be.mem[4:8] == b"\x00\x00\x00\x00"
@@ -63,8 +62,8 @@ def test_dry_run_writes_nothing_and_registers_no_undo(ledger):
     with dryrun.active(True):
         ok, msg = dma.physical_write(be, 0, b"\xff\xff")
     assert ok and "dry-run" in msg.lower()
-    assert be.mem == bytearray(b"\x11" * 8)   # untouched
-    assert not ledger.pending()               # nothing to undo
+    assert be.mem == bytearray(b"\x11" * 8)
+    assert not ledger.pending()
 
 
 def test_read_only_backend_is_refused(ledger):
@@ -86,7 +85,7 @@ def test_no_undo_when_snapshot_unreadable(ledger, monkeypatch):
     monkeypatch.setattr(be, "physical_read", lambda address, size: None)
     ok, msg = dma.physical_write(be, 0, b"\x01\x02", verify=False)
     assert ok and "no rollback" in msg
-    assert not ledger.pending()               # couldn't snapshot -> no undo
+    assert not ledger.pending()
 
 
 def test_write_capable_reflects_backend():

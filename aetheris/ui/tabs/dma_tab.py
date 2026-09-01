@@ -38,7 +38,7 @@ def _parse_addr(text: str) -> int | None:
     if not text:
         return None
     try:
-        return int(text, 16)   # accepts an optional 0x prefix
+        return int(text, 16)
     except ValueError:
         return None
 
@@ -61,7 +61,6 @@ class DmaTab(QWidget):
         self._worker: Worker | None = None
         self._build()
 
-    # -- layout -------------------------------------------------------------
     def _build(self) -> None:
         root = QVBoxLayout(self)
         root.addWidget(QLabel("DMA / Physical Memory", objectName="title"))
@@ -70,7 +69,6 @@ class DmaTab(QWidget):
             "on a writable device, write — physical RAM. Authorized use only.",
             objectName="subtle"))
 
-        # Device row
         dev = QHBoxLayout()
         self.attach_btn = QPushButton("Attach FPGA device")
         self.attach_btn.clicked.connect(self._attach)
@@ -80,7 +78,6 @@ class DmaTab(QWidget):
         dev.addWidget(self.status, 1)
         root.addLayout(dev)
 
-        # Read group
         rg = QGroupBox("Physical read")
         rl = QHBoxLayout(rg)
         rl.addWidget(QLabel("Address 0x"))
@@ -98,7 +95,6 @@ class DmaTab(QWidget):
         rl.addStretch(1)
         root.addWidget(rg)
 
-        # Write group (guarded)
         wg = QGroupBox("Physical write  (guarded · confirmed · reversible)")
         wl = QVBoxLayout(wg)
         warn = QLabel(
@@ -124,7 +120,6 @@ class DmaTab(QWidget):
         wl.addLayout(row)
         root.addWidget(wg)
 
-        # Output
         self.out = QPlainTextEdit()
         self.out.setReadOnly(True)
         self.out.setPlaceholderText("Physical-memory output appears here.")
@@ -132,7 +127,6 @@ class DmaTab(QWidget):
 
         self._refresh_capabilities()
 
-    # -- helpers ------------------------------------------------------------
     def _refresh_capabilities(self) -> None:
         be = self._backend
         writable = bool(be and dma.write_capable(be))
@@ -155,7 +149,6 @@ class DmaTab(QWidget):
     def _busy(self) -> bool:
         return bool(self._worker and self._worker.isRunning())
 
-    # -- device attach ------------------------------------------------------
     def _attach(self) -> None:
         if self._busy():
             return
@@ -180,7 +173,6 @@ class DmaTab(QWidget):
         self.attach_btn.setEnabled(True)
         self.status.setText(f"attach failed: {err}")
 
-    # -- read ---------------------------------------------------------------
     def _read(self) -> None:
         if self._busy() or self._backend is None:
             return
@@ -203,7 +195,6 @@ class DmaTab(QWidget):
         self.out.appendPlainText(f"── physical read @ 0x{addr:x} ({len(data)} bytes) ──")
         self.out.appendPlainText(memvirt.format_hex(bytes(data), base_addr=addr))
 
-    # -- write (guarded) ----------------------------------------------------
     def _write(self) -> None:
         if self._busy() or self._backend is None:
             return

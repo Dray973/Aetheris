@@ -26,21 +26,17 @@ def config_dir() -> Path:
 
 
 DEFAULTS: dict[str, Any] = {
-    "window_geometry": "",        # base64 of QMainWindow.saveGeometry()
-    "window_state": "",           # base64 of QMainWindow.saveState()
+    "window_geometry": "",
+    "window_state": "",
     "active_tab": 0,
     "log_min_level": "TRACE",
     "log_autoscroll": True,
     "network_resolve_dns": False,
     "mft_volume": r"\\.\C:",
     "mft_max_records": 20000,
-    # Persist the tamper-evident audit chain to a per-session JSONL file under
-    # %APPDATA%\AetherisQuantumCore\audit\ so a forensic record survives close.
     "audit_persist": True,
-    # Auto-update source: a public GitHub repo (github:owner/repo) or a
-    # version.json URL (https:// / file://). Public repo required (no auth).
     "update_url": "github:Dray973/Aetheris",
-    "update_auto_check": True,    # check on startup (background)
+    "update_auto_check": True,
     "pending_update_version": "",
 }
 
@@ -60,7 +56,7 @@ class Settings:
                 with self._lock:
                     self._data.update(data)
         except (OSError, json.JSONDecodeError):
-            pass  # missing/corrupt -> keep defaults
+            pass
 
     def get(self, key: str, default: Any = None) -> Any:
         with self._lock:

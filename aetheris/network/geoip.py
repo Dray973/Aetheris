@@ -29,7 +29,7 @@ _COUNTRY_NAMES = ("GeoLite2-Country.mmdb",)
 
 @dataclass
 class GeoLocation:
-    country: str = ""     # ISO code, e.g. "US"
+    country: str = ""
     city: str = ""
     lat: float | None = None
     lon: float | None = None
@@ -50,7 +50,6 @@ def _discover_db() -> tuple[str | None, bool]:
     roots = []
     env = os.environ.get("AETHERIS_GEOIP_DB")
     if env:
-        # Explicit path may point straight at a file.
         if os.path.isfile(env):
             return env, "city" in os.path.basename(env).lower()
         roots.append(Path(env))
@@ -120,7 +119,7 @@ class GeoIPResolver:
                 r = reader.country(ip)
                 loc = GeoLocation(country=r.country.iso_code or "")
         except Exception:
-            loc = GeoLocation()   # address not in DB / private / invalid
+            loc = GeoLocation()
         self._cache[ip] = loc
         return loc
 

@@ -51,7 +51,7 @@ def test_html_document_structure_and_escaping():
     ])
     assert html.startswith("<!doctype html>")
     assert "<title>Report &lt;x&gt;</title>" in html
-    assert "PC&lt;1&gt;" in html           # escaped
+    assert "PC&lt;1&gt;" in html
     assert "a&lt;b&gt;" in html
     assert html.rstrip().endswith("</html>")
 
@@ -61,4 +61,4 @@ def test_session_markdown_has_sections():
     assert "# Aetheris Quantum Core — Session Report" in md
     assert "## Top processes by memory" in md
     assert "## Active remote connections" in md
-    assert "8.8.8.8" in md                  # the one connection with a remote
+    assert "8.8.8.8" in md

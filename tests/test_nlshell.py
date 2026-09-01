@@ -13,7 +13,7 @@ def test_kill_by_memory_threshold_bytes():
     c = nlshell.compile(
         "Terminate all background processes utilizing more than 350MB of system memory right now.")
     assert c.intent == "terminate_by_memory"
-    assert str(350 * 1024 * 1024) in c.script      # 367001600
+    assert str(350 * 1024 * 1024) in c.script
     assert c.risk == "high"
 
 
@@ -21,7 +21,7 @@ def test_set_affinity_mask():
     c = nlshell.compile(
         "Isolate my web browser execution context exclusively to CPU cores 4, 5, and 6.")
     assert c.intent == "set_cpu_affinity"
-    assert "112" in c.script                        # (1<<4)|(1<<5)|(1<<6)
+    assert "112" in c.script
 
 
 def test_kill_by_name():
@@ -30,7 +30,6 @@ def test_kill_by_name():
 
 
 def test_kill_all_processes_is_refused():
-    # Must NOT compile to a "kill everything" script.
     c = nlshell.compile("kill all processes")
     assert not c.matched
 

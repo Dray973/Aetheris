@@ -45,12 +45,12 @@ _BACKUP_KEY = r"Software\Aetheris\DisabledAutoruns"
 class AutorunEntry:
     name: str
     command: str
-    location: str          # human-readable source
-    kind: str              # "registry" | "folder"
+    location: str
+    kind: str
     enabled: bool
-    root: str = ""         # registry: HKCU/HKLM
-    subkey: str = ""       # registry: original Run subkey
-    path: str = ""         # folder: shortcut path
+    root: str = ""
+    subkey: str = ""
+    path: str = ""
 
 
 def _startup_dirs() -> list[tuple[str, str]]:
@@ -158,7 +158,6 @@ def disable(entry: AutorunEntry) -> tuple[bool, str]:
             return True, f"disabled {entry.name}"
         except OSError as exc:
             return False, str(exc)
-    # registry: back up then remove from Run
     try:
         bk = winreg.CreateKeyEx(HKCU, _BACKUP_KEY, 0, winreg.KEY_SET_VALUE)
         meta = json.dumps({"name": entry.name, "command": entry.command,

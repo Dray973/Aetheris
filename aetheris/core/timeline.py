@@ -27,10 +27,10 @@ SRC = "core.timeline"
 class Snapshot:
     seq: int
     ts: float
-    processes: set[tuple[int, str]] = field(default_factory=set)   # (pid, name)
-    listening: set[tuple[str, int]] = field(default_factory=set)   # (proto, port)
-    connections: set[str] = field(default_factory=set)            # "ip:port" remotes
-    autoruns: set[str] = field(default_factory=set)               # "name @ location"
+    processes: set[tuple[int, str]] = field(default_factory=set)
+    listening: set[tuple[str, int]] = field(default_factory=set)
+    connections: set[str] = field(default_factory=set)
+    autoruns: set[str] = field(default_factory=set)
 
     @property
     def label(self) -> str:

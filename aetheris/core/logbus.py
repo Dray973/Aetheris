@@ -19,20 +19,20 @@ from enum import Enum
 
 
 class Level(str, Enum):
-    TRACE = "TRACE"     # raw API call detail (addresses, handles, return codes)
+    TRACE = "TRACE"
     INFO = "INFO"
     WARN = "WARN"
     ERROR = "ERROR"
-    ACTION = "ACTION"   # a state-changing operation was performed
+    ACTION = "ACTION"
     SUCCESS = "SUCCESS"
 
 
 @dataclass(frozen=True)
 class LogEvent:
     level: Level
-    source: str            # e.g. "core.privileges", "network.firewall"
+    source: str
     message: str
-    detail: str = ""       # optional machine detail: return codes, hex addrs
+    detail: str = ""
     ts: float = field(default_factory=time.time)
 
 
@@ -40,7 +40,6 @@ try:
     from PyQt6.QtCore import QObject, pyqtSignal
 
     class _QtEmitter(QObject):
-        # 'event' signal deliberately shadows QObject.event (we only ever emit).
         event = pyqtSignal(object)  # type: ignore[assignment]
 
     _emitter: _QtEmitter | None = _QtEmitter()
@@ -85,7 +84,6 @@ def log(source: str, message: str, level: Level = Level.INFO, detail: str = "") 
     emit(LogEvent(level=level, source=source, message=message, detail=detail))
 
 
-# Terse aliases for readability at call sites.
 def trace(source: str, message: str, detail: str = "") -> None:
     log(source, message, Level.TRACE, detail)
 

@@ -30,7 +30,7 @@ TCP_TABLE_OWNER_PID_ALL = 5
 TcpConnectionEstatsData = 0
 ERROR_INSUFFICIENT_BUFFER = 122
 
-ConnKey = tuple  # (laddr, lport, raddr, rport)
+ConnKey = tuple
 
 
 class MIB_TCPROW_OWNER_PID(ctypes.Structure):
@@ -59,7 +59,6 @@ class TCP_ESTATS_DATA_RW_v0(ctypes.Structure):
 
 
 class TCP_ESTATS_DATA_ROD_v0(ctypes.Structure):
-    # Only the leading fields we need are named; the rest is padding.
     _fields_ = [
         ("DataBytesOut", ctypes.c_uint64),
         ("DataSegsOut", ctypes.c_uint64),
@@ -95,7 +94,6 @@ def tcp_table() -> list[tuple[ConnKey, int, MIB_TCPROW_OWNER_PID]]:
     for row in arr:
         key = (_fmt_addr(row.dwLocalAddr), _port(row.dwLocalPort),
                _fmt_addr(row.dwRemoteAddr), _port(row.dwRemotePort))
-        # Copy the row into a standalone struct (buf is freed on return).
         out.append((key, int(row.dwOwningPid),
                     MIB_TCPROW_OWNER_PID.from_buffer_copy(row)))
     return out
@@ -158,7 +156,7 @@ class PerProcessBandwidth:
         last_rc = None
         snap: dict[ConnKey, tuple[int, int]] = {}
         for key, _pid, row in tcp_table():
-            if row.dwState != 5:                 # MIB_TCP_STATE_ESTAB
+            if row.dwState != 5:
                 continue
             established += 1
             mib = MIB_TCPROW(row.dwState, row.dwLocalAddr, row.dwLocalPort,
@@ -195,7 +193,7 @@ class PerProcessBandwidth:
         for key, pid, row in tcp_table():
             owners[key] = pid
             data = self._read(row)
-            if data is None:                      # newly seen conn: enable + seed
+            if data is None:
                 if self._enable(row):
                     data = self._read(row)
             if data is not None:

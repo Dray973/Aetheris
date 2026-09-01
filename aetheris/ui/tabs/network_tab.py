@@ -50,8 +50,6 @@ class NetworkTab(QWidget):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.refresh)
         self._timer.start(3000)
-        # Bandwidth sampled on a faster, independent cadence so the throughput
-        # chart is smooth while the (heavier) socket table stays on 3 s.
         self._bw_timer = QTimer(self)
         self._bw_timer.timeout.connect(self._sample_bandwidth)
         self._bw_timer.start(1000)
@@ -123,8 +121,6 @@ class NetworkTab(QWidget):
         root.addLayout(actions)
 
     def refresh(self) -> None:
-        # Bandwidth is handled by _sample_bandwidth on its own timer; here we
-        # only refresh the (heavier) socket table.
         if self._worker and self._worker.isRunning():
             return
         self._worker = Worker(connections.snapshot, resolve_dns=self.dns_cb.isChecked())
@@ -197,7 +193,7 @@ class NetworkTab(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
-        self._run(firewall.isolate, self._show_isolate, exe)   # COM can block
+        self._run(firewall.isolate, self._show_isolate, exe)
 
     def _show_isolate(self, res) -> None:
         self._toast(res.ok, res.message)
@@ -209,7 +205,6 @@ class NetworkTab(QWidget):
         if not active:
             self._toast(True, "no active Aetheris isolation rules")
             return
-        # Rules are named "... : <label> (in|out)"; derive labels.
         labels = sorted({r.split(":", 1)[1].rsplit("(", 1)[0].strip()
                          for r in active if ":" in r})
         from PyQt6.QtWidgets import QInputDialog

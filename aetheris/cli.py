@@ -69,7 +69,7 @@ def _timestamped(path: str, index: int = 0, count: int = 1) -> str:
     base = f"{p.stem}-{stamp}{seq}"
     cand = p.with_name(f"{base}{p.suffix}")
     i = 1
-    while cand.exists():                      # cross-run backstop
+    while cand.exists():
         cand = p.with_name(f"{base}-{i}{p.suffix}")
         i += 1
     return str(cand)

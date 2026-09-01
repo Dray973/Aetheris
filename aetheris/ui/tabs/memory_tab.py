@@ -50,12 +50,10 @@ class MemoryTab(QWidget):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.refresh)
         self._timer.start(4000)
-        # Telemetry sampled on its own faster cadence; the chart renders smoothly
-        # between samples while psutil is polled cheaply (non-blocking).
         self._tele_timer = QTimer(self)
         self._tele_timer.timeout.connect(self._sample_telemetry)
         self._tele_timer.start(500)
-        psutil.cpu_percent(interval=None)   # prime the first (0.0) reading
+        psutil.cpu_percent(interval=None)
         self.refresh()
 
     def _sample_telemetry(self) -> None:
@@ -64,7 +62,6 @@ class MemoryTab(QWidget):
             "ram": psutil.virtual_memory().percent,
         })
 
-    # -- layout -------------------------------------------------------------
     def _build(self) -> None:
         outer = QVBoxLayout(self)
         outer.addWidget(QLabel("Live Memory Forensics & Process Autopsy", objectName="title"))
@@ -160,7 +157,6 @@ class MemoryTab(QWidget):
         root.addLayout(actions)
         return page
 
-    # -- data ---------------------------------------------------------------
     def refresh(self) -> None:
         if self._worker and self._worker.isRunning():
             return
@@ -183,7 +179,7 @@ class MemoryTab(QWidget):
                 item = QTableWidgetItem(v)
                 if c in (0, 3, 4, 5):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                if c == 7 and r.signature == "unsigned":       # flag unsigned images
+                if c == 7 and r.signature == "unsigned":
                     item.setForeground(QColor("#e0b341"))
                 self.table.setItem(i, c, item)
         self.count_lbl.setText(f"{len(shown)} / {len(self._rows)} processes")
@@ -194,7 +190,6 @@ class MemoryTab(QWidget):
             return None
         return int(self.table.item(row, 0).text())
 
-    # -- process actions ----------------------------------------------------
     def _terminate(self) -> None:
         pid = self._selected_pid()
         if pid is None:
@@ -229,7 +224,6 @@ class MemoryTab(QWidget):
             self.addr.setFocus()
             logbus.trace("ui.memory", f"autopsy opened for pid {pid}")
 
-    # -- RAM matrix ---------------------------------------------------------
     def _confirm(self, title: str, text: str) -> bool:
         return QMessageBox.question(self, title, text) == QMessageBox.StandardButton.Yes
 
@@ -238,7 +232,7 @@ class MemoryTab(QWidget):
                              "Trim EVERY accessible process working set? "
                              "(reversible; causes a brief latency spike)"):
             return
-        self._run(memory.empty_all_working_sets, self._show_trim)   # walks all procs
+        self._run(memory.empty_all_working_sets, self._show_trim)
 
     def _show_trim(self, res) -> None:
         ok, attempted = res
@@ -257,7 +251,6 @@ class MemoryTab(QWidget):
         ok, msg = memory.flush_file_cache()
         self._toast(ok, msg)
 
-    # -- assembly studio ----------------------------------------------------
     def _parse_addr(self) -> int | None:
         try:
             return int(self.addr.text().strip(), 16)

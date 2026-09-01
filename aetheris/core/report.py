@@ -24,9 +24,6 @@ from typing import Any
 APP = "Aetheris Quantum Core"
 
 
-# --------------------------------------------------------------------------
-# Generic serializers
-# --------------------------------------------------------------------------
 def rows_to_csv(headers: Sequence[str], rows: Iterable[Sequence[Any]]) -> str:
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
@@ -45,9 +42,6 @@ def escape_html(s: Any) -> str:
             .replace(">", "&gt;").replace('"', "&quot;"))
 
 
-# --------------------------------------------------------------------------
-# Domain row builders
-# --------------------------------------------------------------------------
 def process_rows(procs: Iterable[Any]) -> list[dict[str, Any]]:
     out = []
     for p in procs:
@@ -72,9 +66,6 @@ def connection_rows(conns: Iterable[Any]) -> list[dict[str, Any]]:
     return out
 
 
-# --------------------------------------------------------------------------
-# System summary
-# --------------------------------------------------------------------------
 def system_summary() -> dict[str, Any]:
     info: dict[str, Any] = {
         "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -95,9 +86,6 @@ def system_summary() -> dict[str, Any]:
     return info
 
 
-# --------------------------------------------------------------------------
-# HTML report
-# --------------------------------------------------------------------------
 _HTML_HEAD = """<!doctype html><html><head><meta charset="utf-8">
 <title>{title}</title><style>
 body{{background:#0b0e14;color:#c8d3f5;font-family:Segoe UI,Arial,sans-serif;margin:24px}}

@@ -14,9 +14,9 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 
 class Worker(QThread):
-    done = pyqtSignal(object)       # result
-    failed = pyqtSignal(str)        # error string
-    progress = pyqtSignal(str)      # optional status text
+    done = pyqtSignal(object)
+    failed = pyqtSignal(str)
+    progress = pyqtSignal(str)
 
     def __init__(self, fn: Callable[..., Any], *args, **kwargs) -> None:
         super().__init__()
@@ -24,7 +24,7 @@ class Worker(QThread):
         self._args = args
         self._kwargs = kwargs
 
-    def run(self) -> None:  # executes on the worker thread
+    def run(self) -> None:
         try:
             result = self._fn(*self._args, **self._kwargs)
             self.done.emit(result)

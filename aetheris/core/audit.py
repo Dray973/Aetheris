@@ -39,7 +39,6 @@ class AuditRecord:
 
 def _hash(seq: int, ts: float, level: str, source: str, message: str,
           detail: str, prev_hash: str) -> str:
-    # Canonical, stable serialization -> identical bytes on recompute/reload.
     payload = json.dumps(
         [seq, f"{ts:.6f}", level, source, message, detail, prev_hash],
         separators=(",", ":"), ensure_ascii=True, sort_keys=False,
@@ -97,7 +96,6 @@ class AuditLog:
         with self._lock:
             return len(self._records)
 
-    # -- persistence --------------------------------------------------------
     def _open(self, path: str) -> bool:
         """Open a line-buffered append handle, kept open for the session so each
         record is one cheap `write` (no per-event open/close), never blocking."""
@@ -120,7 +118,7 @@ class AuditLog:
         try:
             fh.write(json.dumps(asdict(rec), ensure_ascii=True) + "\n")
         except OSError:
-            pass  # persistence is best-effort; the in-memory chain still stands
+            pass
 
     def start_persistence(self, path: str) -> bool:
         """Begin persisting to *path*, flushing any already-buffered records first
@@ -128,7 +126,7 @@ class AuditLog:
         with self._lock:
             if not self._open(path):
                 return False
-            for rec in self._records:      # write the backlog before new events
+            for rec in self._records:
                 self._persist(rec)
             return True
 
@@ -141,7 +139,7 @@ class AuditLog:
                     pass
                 self._fh = None
 
-    def __del__(self) -> None:            # best-effort handle release
+    def __del__(self) -> None:
         try:
             self.close()
         except Exception:
@@ -181,7 +179,6 @@ def verify_audit_log(path: str) -> tuple[bool, int]:
     return log.verify()
 
 
-# Process-wide audit trail for the running session.
 audit = AuditLog()
 
 

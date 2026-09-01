@@ -51,13 +51,13 @@ def test_disable_enable_registry_roundtrip():
     try:
         e = next(x for x in autoruns.enumerate_entries() if x.name == name and x.enabled)
         ok, _ = autoruns.disable(e)
-        assert ok and _get() is None                      # removed from Run
+        assert ok and _get() is None
 
         e2 = next(x for x in autoruns.enumerate_entries() if x.name == name)
-        assert not e2.enabled                              # shows as disabled
+        assert not e2.enabled
 
         ok2, _ = autoruns.enable(e2)
-        assert ok2 and _get() == val                       # restored exactly
+        assert ok2 and _get() == val
     finally:
         _del(RUN)
         _del(autoruns._BACKUP_KEY)

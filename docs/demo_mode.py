@@ -100,11 +100,9 @@ class Demo:
     def __init__(self, w, interval: float) -> None:
         self.w = w
         self.frame = 0
-        # Animate the charts continuously so recordings have motion.
         self.anim = QTimer(w)
         self.anim.timeout.connect(self._animate)
         self.anim.start(200)
-        # Advance tabs on the slower cadence.
         self.cycle = QTimer(w)
         self.cycle.timeout.connect(self._advance)
         self.cycle.start(int(interval * 1000))
@@ -136,7 +134,6 @@ def main() -> int:
     demo = Demo(w, args.interval)
 
     if args.selftest:
-        # Cycle quickly a few times, verify the index advances, then quit.
         demo.cycle.setInterval(120)
         start = w.tabs.currentIndex()
         seen: set[int] = set()
@@ -151,7 +148,7 @@ def main() -> int:
         t = QTimer(w)
         t.timeout.connect(check)
         t.start(60)
-        QTimer.singleShot(8000, app.quit)   # hard stop safety net
+        QTimer.singleShot(8000, app.quit)
 
     return app.exec()
 

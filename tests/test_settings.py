@@ -16,10 +16,9 @@ def test_set_save_load_roundtrip(tmp_path):
     assert s.save()
     assert p.is_file()
 
-    s2 = Settings(p)                       # fresh instance reads from disk
+    s2 = Settings(p)
     assert s2.get("active_tab") == 3
     assert s2.get("network_resolve_dns") is True
-    # unset keys still fall back to defaults
     assert s2.get("log_min_level") == DEFAULTS["log_min_level"]
 
 

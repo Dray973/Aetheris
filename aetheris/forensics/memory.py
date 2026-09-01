@@ -76,7 +76,6 @@ def purge_standby_list(low_priority_only: bool = False) -> tuple[bool, str]:
     if status == 0:
         logbus.action(SRC, "purged standby page list")
         return True, "standby list purged"
-    # NTSTATUS is signed; format as unsigned hex for readability.
     return False, f"NtSetSystemInformation NTSTATUS 0x{status & 0xFFFFFFFF:08X}"
 
 

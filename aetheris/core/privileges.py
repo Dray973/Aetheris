@@ -27,14 +27,13 @@ from ctypes import wintypes
 
 from . import winapi as W
 
-# Privileges the forensics/memory/storage features rely on.
 FORENSICS_PRIVILEGES = (
-    "SeDebugPrivilege",            # open other processes for VM read/query
-    "SeTakeOwnershipPrivilege",    # claim ownership of locked/protected objects
-    "SeBackupPrivilege",           # RegSaveKeyEx snapshots, raw reads
-    "SeRestorePrivilege",          # restore snapshot hives (rollback)
-    "SeProfileSingleProcessPrivilege",  # memory-list / cache operations
-    "SeIncreaseQuotaPrivilege",    # working-set / cache sizing
+    "SeDebugPrivilege",
+    "SeTakeOwnershipPrivilege",
+    "SeBackupPrivilege",
+    "SeRestorePrivilege",
+    "SeProfileSingleProcessPrivilege",
+    "SeIncreaseQuotaPrivilege",
 )
 
 
@@ -57,16 +56,12 @@ def relaunch_as_admin(extra_args: Iterable[str] | None = None) -> bool:
         return False
     args = list(sys.argv[1:]) + list(extra_args or [])
     if getattr(sys, "frozen", False):
-        # Frozen exe: sys.executable IS the app; relaunch it directly with the
-        # bare args (there is no separate script path to pass).
         target = sys.executable
         params = " ".join(f'"{a}"' for a in args)
     else:
-        # Interpreter run: relaunch python with the script path + args.
         target = sys.executable
         params = " ".join(f'"{a}"' for a in ([os.path.abspath(sys.argv[0])] + args))
     try:
-        # SW_SHOWNORMAL = 1. Return value > 32 means success.
         rc = W.shell32.ShellExecuteW(None, "runas", target, params, None, 1)
         return int(rc) > 32
     except Exception:
@@ -109,8 +104,6 @@ def enable_privilege(name: str) -> tuple[bool, str]:
         ):
             return False, f"AdjustTokenPrivileges failed: {W.last_error_str()}"
 
-        # AdjustTokenPrivileges can "succeed" but not assign all privileges.
-        # ERROR_NOT_ALL_ASSIGNED == 1300.
         err = ctypes.get_last_error()
         if err == 1300:
             return False, f"{name}: not held by this token (ERROR_NOT_ALL_ASSIGNED)"
@@ -129,7 +122,6 @@ def enable_forensics_privileges() -> list[tuple[str, bool, str]]:
 
 
 if W.IS_WINDOWS:
-    # Argument/restype hints so ctypes marshals 64-bit handles correctly.
     W.advapi32.OpenProcessToken.argtypes = [
         wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)
     ]

@@ -30,9 +30,6 @@ from ..core import winapi as W
 SRC = "forensics.memvirt"
 
 
-# --------------------------------------------------------------------------
-# Data model
-# --------------------------------------------------------------------------
 @dataclass
 class MemoryRegion:
     base: int
@@ -52,7 +49,7 @@ class MemoryProcess:
     name: str
     ppid: int = 0
     path: str = ""
-    hidden: bool = False       # only meaningful on physical-scan backends
+    hidden: bool = False
 
 
 @dataclass
@@ -60,12 +57,9 @@ class Capabilities:
     physical: bool = False
     hidden_detection: bool = False
     page_tables: bool = False
-    physical_write: bool = False   # DMA write-back (PCILeech FPGA / writable device)
+    physical_write: bool = False
 
 
-# --------------------------------------------------------------------------
-# Win32 constants + structures for the live backend
-# --------------------------------------------------------------------------
 class MEMORY_BASIC_INFORMATION(ctypes.Structure):
     _fields_ = [
         ("BaseAddress", ctypes.c_void_p),
@@ -97,9 +91,6 @@ def _protect_str(flags: int) -> str:
     return base
 
 
-# --------------------------------------------------------------------------
-# Backend interface
-# --------------------------------------------------------------------------
 class MemoryBackend(ABC):
     name: str = "abstract"
     capabilities: Capabilities = Capabilities()
@@ -125,9 +116,6 @@ class MemoryBackend(ABC):
         pass
 
 
-# --------------------------------------------------------------------------
-# Live Win32 backend (always available on Windows, elevated)
-# --------------------------------------------------------------------------
 class LiveBackend(MemoryBackend):
     name = "Live Win32 (VirtualQueryEx / ReadProcessMemory)"
     capabilities = Capabilities(physical=False, hidden_detection=False, page_tables=False)
@@ -204,14 +192,8 @@ class LiveBackend(MemoryBackend):
             W.kernel32.CloseHandle(h)
 
 
-# --------------------------------------------------------------------------
-# MemProcFS physical-memory backend (activates when the library initializes)
-# --------------------------------------------------------------------------
 class MemProcFSBackend(MemoryBackend):
     name = "MemProcFS (physical RAM virtualization)"
-    # A live FPGA/PCILeech device is writable; a read-only dump is not. The
-    # capability is corrected per-device in try_create so the UI never offers a
-    # DMA write against a source that can't take one.
     capabilities = Capabilities(physical=True, hidden_detection=True,
                                 page_tables=True, physical_write=False)
 
@@ -232,13 +214,6 @@ class MemProcFSBackend(MemoryBackend):
         except Exception:
             logbus.trace(SRC, "memprocfs not installed; using live backend")
             return None
-        # Candidate devices: an explicit request first (so the DMA tab's
-        # get_backend("fpga") drives the card), then the live WinPMEM driver as
-        # the auto fallback. 'fpga' is deliberately NOT in the default auto-probe
-        # because get_backend() runs synchronously at startup (the Memory tab's
-        # scanner) and probing a PCILeech card that isn't attached can stall the
-        # LeechCore/FTDI enumeration -- the DMA tab requests it explicitly, on a
-        # Worker, when the operator asks.
         candidates = [device] if device else []
         candidates += ["pmem"]
         for dev in candidates:
@@ -247,8 +222,6 @@ class MemProcFSBackend(MemoryBackend):
             try:
                 vmm = memprocfs.Vmm(["-device", dev])
                 backend = cls(vmm, device=dev)
-                # A physical device (fpga/pmem) can be written back over DMA; a
-                # dump file is inspected read-only.
                 backend.capabilities = Capabilities(
                     physical=True, hidden_detection=True, page_tables=True,
                     physical_write=dev in ("fpga", "pmem"),
@@ -269,8 +242,6 @@ class MemProcFSBackend(MemoryBackend):
                     name=getattr(proc, "name", "?"),
                     ppid=getattr(proc, "ppid", 0),
                     path=getattr(proc, "fullname", "") or "",
-                    # A physically-scanned process absent from the API-linked
-                    # list is the classic "unlinked" signal.
                     hidden=bool(getattr(proc, "is_usermode", True) is False),
                 ))
         except Exception as exc:  # noqa: BLE001
@@ -334,9 +305,6 @@ def get_backend(device: str | None = None, prefer_memprocfs: bool = True) -> Mem
     return LiveBackend()
 
 
-# --------------------------------------------------------------------------
-# Hex-dump formatter (shared by the UI)
-# --------------------------------------------------------------------------
 def format_hex(data: bytes, base_addr: int = 0, width: int = 16) -> str:
     lines = []
     for off in range(0, len(data), width):

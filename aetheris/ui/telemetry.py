@@ -27,11 +27,6 @@ except Exception:  # pragma: no cover - fallback path
     pg = None       # type: ignore
     _HAS_PG = False
 
-# pyqtgraph's default Qt paint path already renders these small rolling series
-# smoothly at 60 FPS. The per-curve OpenGL fast path (opt-in via use_gl=True) is
-# only worthwhile for very large datasets and needs both PyOpenGL *and* a live
-# GL surface — absent one (offscreen, RDP, software rendering) it throws on
-# every paint. We therefore gate it on PyOpenGL AND keep it off by default.
 try:
     import OpenGL  # noqa: F401
     _HAS_GL = True
@@ -54,7 +49,6 @@ class TelemetryChart(QWidget):
         self._y_range = y_range
         self._build(y_label, use_gl)
 
-    # -- construction -------------------------------------------------------
     def _build(self, y_label: str, use_gl: bool) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -84,7 +78,7 @@ class TelemetryChart(QWidget):
             self.plot.enableAutoRange(axis="y")
         if use_gl and _HAS_GL:
             try:
-                self.plot.useOpenGL(True)      # PyOpenGL-accelerated curve path
+                self.plot.useOpenGL(True)
             except Exception:
                 pass
 
@@ -112,7 +106,6 @@ class TelemetryChart(QWidget):
         row.addStretch(1)
         layout.addLayout(row)
 
-    # -- data ---------------------------------------------------------------
     def push(self, sample: dict) -> None:
         """Append one sample; missing keys hold their previous value."""
         if not _HAS_PG:

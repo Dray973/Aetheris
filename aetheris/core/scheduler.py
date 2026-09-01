@@ -19,14 +19,13 @@ DEFAULT_TASK = "AetherisCapture"
 
 def _pythonw() -> str:
     base = Path(sys.executable)
-    cand = base.with_name("pythonw.exe")     # no console window
+    cand = base.with_name("pythonw.exe")
     return str(cand if cand.exists() else base)
 
 
 def capture_command(out_file: str, fmt: str = "html") -> str:
     """The command a scheduled task runs (a single schtasks /TR string)."""
     if getattr(sys, "frozen", False):
-        # Frozen exe: it dispatches "cli <args>" to the headless CLI (see run.py).
         return f'"{sys.executable}" cli --format {fmt} --out "{out_file}" report'
     return (f'"{_pythonw()}" -m aetheris.cli --format {fmt} '
             f'--out "{out_file}" report')

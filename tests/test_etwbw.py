@@ -20,13 +20,11 @@ def test_sampler_interface_and_lifecycle():
         assert isinstance(s.status, str) and s.status
         rates = s.sample()
         assert isinstance(rates, dict)
-        # sample() never raises whether or not the session is live.
         for pid, rate in rates.items():
             assert isinstance(pid, int)
             assert len(rate) == 2
     finally:
         s.stop()
-    # stop() is idempotent.
     s.stop()
 
 
@@ -56,11 +54,11 @@ def test_on_event_attributes_tcpip_opcodes_to_pid():
     import struct
 
     s = etwbw.EtwBandwidth()
-    s.stop()                                  # halt any live session first
+    s.stop()
     with s._lock:
         s._totals.clear()
     sentinel = 0x00BEEF01
-    held = []                                 # keep payload buffers alive
+    held = []
 
     def inject(opcode: int, size: int) -> None:
         payload = struct.pack("<II", sentinel, size) + b"\x00" * 16
@@ -72,13 +70,13 @@ def test_on_event_attributes_tcpip_opcodes_to_pid():
         rec.UserDataLength = len(payload)
         s._on_event(ctypes.pointer(rec))
 
-    inject(10, 1500)      # TCP send IPv4  -> sent
-    inject(26, 500)       # TCP send IPv6  -> sent
-    inject(11, 4096)      # TCP recv IPv4  -> recv
-    inject(12, 9999)      # connect (non-data opcode) -> ignored
+    inject(10, 1500)
+    inject(26, 500)
+    inject(11, 4096)
+    inject(12, 9999)
     sent, recv = s._totals[sentinel]
-    assert sent == 1500 + 500              # only the send opcodes
-    assert recv == 4096                    # only the recv opcode; connect ignored
+    assert sent == 1500 + 500
+    assert recv == 4096
 
 
 def test_live_capture_attributes_bytes_when_elevated():

@@ -14,7 +14,6 @@ from ctypes import wintypes
 
 IS_WINDOWS = sys.platform == "win32"
 
-# --- DLL handles -----------------------------------------------------------
 if IS_WINDOWS:
     ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -25,7 +24,6 @@ else:  # pragma: no cover - non-Windows import guard
     ntdll = kernel32 = advapi32 = psapi = shell32 = None
 
 
-# --- Common constants ------------------------------------------------------
 PROCESS_QUERY_INFORMATION = 0x0400
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 PROCESS_VM_READ = 0x0010
@@ -44,28 +42,23 @@ PROCESS_DUP_HANDLE = 0x0040
 DUPLICATE_CLOSE_SOURCE = 0x00000001
 DUPLICATE_SAME_ACCESS = 0x00000002
 
-# NtQuerySystemInformation / NtQueryObject classes for handle enumeration.
 SYSTEM_EXTENDED_HANDLE_INFORMATION = 64
 OBJECT_NAME_INFORMATION = 1
 STATUS_INFO_LENGTH_MISMATCH = 0xC0000004
-# Synchronous file/pipe handles whose name query can block; skip these.
 GRANTED_ACCESS_HANG = 0x0012019F
 
 SE_PRIVILEGE_ENABLED = 0x00000002
 
-# NtQuerySystemInformation classes we care about.
 SYSTEM_BASIC_INFORMATION = 0
 SYSTEM_PROCESS_INFORMATION = 5
 SYSTEM_HANDLE_INFORMATION = 16
-SYSTEM_MEMORY_LIST_INFORMATION = 0x50  # NtSetSystemInformation, purge standby list
+SYSTEM_MEMORY_LIST_INFORMATION = 0x50
 
-# SystemMemoryListInformation commands.
 MEMORY_PURGE_STANDBY_LIST = 4
 MEMORY_PURGE_LOW_PRIORITY_STANDBY_LIST = 5
 MEMORY_EMPTY_WORKING_SETS = 2
 
 
-# --- Common structures -----------------------------------------------------
 class LUID(ctypes.Structure):
     _fields_ = [("LowPart", wintypes.DWORD), ("HighPart", wintypes.LONG)]
 
@@ -81,10 +74,6 @@ class TOKEN_PRIVILEGES(ctypes.Structure):
     ]
 
 
-# --- Shared function signatures --------------------------------------------
-# Bound here (not per-consumer) so a 64-bit HANDLE returned by OpenProcess /
-# GetCurrentProcess is never truncated to a 32-bit int -- a real x64 correctness
-# hazard if a module that calls these imports before one that set the restype.
 if IS_WINDOWS:
     kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel32.OpenProcess.restype = wintypes.HANDLE

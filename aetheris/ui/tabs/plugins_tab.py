@@ -56,7 +56,6 @@ class PluginsTab(QWidget):
         self.desc = QLabel("", objectName="subtle")
         self.desc.setWordWrap(True)
         rv.addWidget(self.desc)
-        # Page 0: text output. Page 1: host for GUI (widget) plugins.
         self.stack = QStackedWidget()
         self.output = QPlainTextEdit(readOnly=True)
         self.output.setFont(QFont("Cascadia Code", 10))
@@ -160,7 +159,6 @@ class PluginsTab(QWidget):
         if p.trust in ("untrusted", "modified") and not self._confirm_untrusted(p):
             return
         if p.kind == "widget":
-            # GUI plugin: build and embed its widget (runs on the UI thread).
             self._clear_host()
             try:
                 self._host_layout.addWidget(p.widget())

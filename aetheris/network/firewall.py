@@ -17,7 +17,6 @@ from ..core import dryrun, logbus, safety
 
 SRC = "network.firewall"
 
-# INetFwRule / policy enums
 NET_FW_RULE_DIR_IN = 1
 NET_FW_RULE_DIR_OUT = 2
 NET_FW_ACTION_BLOCK = 0
@@ -67,7 +66,6 @@ def isolate(app_path: str, label: str | None = None) -> IsolationResult:
             names.append(rule.Name)
             logbus.action(SRC, f"BLOCK rule added: {rule.Name}", app_path)
 
-        # Register the reversal with the panic ledger.
         safety.ledger.register(
             f"firewall isolation: {label}",
             lambda p=app_path, ns=list(names): _remove_rules(ns),

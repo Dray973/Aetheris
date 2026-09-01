@@ -20,7 +20,6 @@ import sys
 import time
 from pathlib import Path
 
-# Native platform => real font rendering (the offscreen plugin draws tofu).
 os.environ.pop("QT_QPA_PLATFORM", None)
 
 REPO = Path(__file__).resolve().parent.parent
@@ -74,7 +73,6 @@ def _inner_tab(widget, label: str) -> None:
 def main() -> None:
     pump(1.5)
 
-    # 1) Memory / Process Autopsy (note the live Authenticode "Signed" column)
     mem = w.tabs.widget(0)
     mem._timer.stop()
     mem._populate([
@@ -101,7 +99,6 @@ def main() -> None:
                             "ram": 55 + 6 * math.sin(i / 30)})
     w.tabs.setCurrentIndex(0); pump(0.4); shot("01-memory.png")
 
-    # 2) Storage tree-map
     st = w.tabs.widget(1)
     R = mft.MftRecord
     recs = [R(5, True, True, "C:\\", 0, 5)]
@@ -125,7 +122,6 @@ def main() -> None:
     st.treemap.resize(1400, 560); st.treemap._relayout()
     w.tabs.setCurrentIndex(1); pump(0.5); shot("02-storage-treemap.png")
 
-    # 3) Network
     net = w.tabs.widget(2)
     net._timer.stop()
     net._pp_rates = {1234: (48_000.0, 512_000.0), 4020: (1200.0, 8600.0),
@@ -149,7 +145,6 @@ def main() -> None:
                              "down": 420 + 120 * math.sin(i / 10)})
     w.tabs.setCurrentIndex(2); pump(0.5); shot("03-network.png")
 
-    # 4) Shell -> Services & Drivers (unquoted-path privesc finder in red)
     shell = w.tabs.widget(3)
     shell._services = [
         ServiceInfo("Dnscache", "DNS Client", r"C:\Windows\System32\svchost.exe",
@@ -157,7 +152,7 @@ def main() -> None:
                     "NT AUTHORITY\\NetworkService", "running", "signed", False),
         ServiceInfo("AppUpdater", "App Updater", r'C:\Program Files\My App\upd.exe',
                     r'C:\Program Files\My App\upd.exe', "auto", "service",
-                    "LocalSystem", "running", "signed", True),   # unquoted path
+                    "LocalSystem", "running", "signed", True),
         ServiceInfo("HelperSvc", "Vendor Helper",
                     r"C:\Users\user\AppData\Local\Temp\helper.exe",
                     r"C:\Users\user\AppData\Local\Temp\helper.exe", "auto", "service",
@@ -173,7 +168,6 @@ def main() -> None:
     shell._apply_svc_filter()
     w.tabs.setCurrentIndex(3); pump(0.4); shot("04-services.png")
 
-    # 5) Shell -> Persistence Map (unified autostart view)
     shell._pm = [
         PersistenceEntry("Run", "OneDrive",
                          r"C:\Users\user\AppData\Local\Microsoft\OneDrive\OneDrive.exe /background",
@@ -195,7 +189,6 @@ def main() -> None:
     shell._apply_pm_filter()
     w.tabs.setCurrentIndex(3); pump(0.4); shot("05-persistence.png")
 
-    # 6) Timeline -> state diff between two session snapshots
     tlab = w.tabs.widget(5)
     now = time.time()
     tlab._timeline.add(tl.Snapshot(
@@ -216,14 +209,12 @@ def main() -> None:
     tlab._diff()
     w.tabs.setCurrentIndex(5); pump(0.4); shot("06-timeline.png")
 
-    # 7) Auto-Shell
     aut = w.tabs.widget(4)
     aut.input.setText("Terminate all background processes utilizing more than "
                       "350MB of system memory right now.")
     aut._compile()
     w.tabs.setCurrentIndex(4); pump(0.3); shot("07-autoshell.png")
 
-    # 8) DMA / Physical Memory (PCILeech FPGA read + guarded write)
     dma_tab = w.tabs.widget(6)
 
     class _StubFPGA:
@@ -244,7 +235,6 @@ def main() -> None:
     dma_tab.out.appendPlainText("✓ wrote 4 bytes @ 0x1a2b3040")
     w.tabs.setCurrentIndex(6); pump(0.4); shot("08-dma.png")
 
-    # 9) Plugins (v2 gallery: trust + declared permission scope)
     plugins_tab = w.tabs.widget(7)
     for i in range(plugins_tab.list.count()):
         if plugins_tab.list.item(i).text().startswith("system-gauges"):

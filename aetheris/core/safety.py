@@ -30,9 +30,6 @@ from . import winapi as W
 SRC = "core.safety"
 
 
-# --------------------------------------------------------------------------
-# Rollback ledger
-# --------------------------------------------------------------------------
 @dataclass
 class RollbackEntry:
     label: str
@@ -74,13 +71,9 @@ class RollbackLedger:
         return results
 
 
-# Process-wide session ledger.
 ledger = RollbackLedger()
 
 
-# --------------------------------------------------------------------------
-# System Restore Point
-# --------------------------------------------------------------------------
 def create_restore_point(description: str = "Aetheris Quantum Core session") -> tuple[bool, str]:
     """
     Create a System Restore checkpoint. Tries WMI first, then PowerShell.
@@ -89,14 +82,12 @@ def create_restore_point(description: str = "Aetheris Quantum Core session") -> 
     if not W.IS_WINDOWS:
         return False, "restore points only exist on Windows"
 
-    # Preferred: WMI SystemRestore provider via win32com.
     try:
         import win32com.client
 
         locator = win32com.client.Dispatch("WbemScripting.SWbemLocator")
         svc = locator.ConnectServer(".", r"root\default")
         sr = svc.Get("SystemRestore")
-        # 0 = APPLICATION_INSTALL, 100 = BEGIN_SYSTEM_CHANGE
         rc = sr.CreateRestorePoint(description, 0, 100)
         if rc == 0:
             logbus.success(SRC, "System Restore Point created (WMI)")
@@ -105,7 +96,6 @@ def create_restore_point(description: str = "Aetheris Quantum Core session") -> 
     except Exception as exc:  # noqa: BLE001
         logbus.warn(SRC, "WMI restore point failed, trying PowerShell", str(exc))
 
-    # Fallback: PowerShell Checkpoint-Computer.
     try:
         cmd = [
             "powershell", "-NoProfile", "-NonInteractive", "-Command",
@@ -121,9 +111,6 @@ def create_restore_point(description: str = "Aetheris Quantum Core session") -> 
         return False, f"restore point failed: {exc}"
 
 
-# --------------------------------------------------------------------------
-# Registry snapshot via RegSaveKeyEx
-# --------------------------------------------------------------------------
 HKEY_CLASSES_ROOT = 0x80000000
 HKEY_CURRENT_USER = 0x80000001
 HKEY_LOCAL_MACHINE = 0x80000002
@@ -159,7 +146,7 @@ def snapshot_registry_key(root: str, subkey: str, out_path: str) -> tuple[bool, 
         return False, f"RegOpenKeyEx failed (code {rc})"
     try:
         if os.path.exists(out_path):
-            os.remove(out_path)  # RegSaveKeyEx refuses to overwrite
+            os.remove(out_path)
         rc = W.advapi32.RegSaveKeyExW(hkey, out_path, None, REG_LATEST_FORMAT)
         if rc != 0:
             return False, f"RegSaveKeyEx failed (code {rc})"

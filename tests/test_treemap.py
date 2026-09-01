@@ -31,7 +31,6 @@ def test_squarify_rectangles_stay_in_bounds():
 def test_squarify_proportional_to_value():
     placed = {n: rw * rh for n, (rx, ry, rw, rh)
               in squarify([("big", 90), ("small", 10)], 0, 0, 100, 100)}
-    # Areas should track the 9:1 value ratio.
     assert placed["big"] > placed["small"] * 5
 
 
@@ -48,7 +47,7 @@ def no_qt():
     finder = _BlockPyQt6()
     saved = {k: v for k, v in list(sys.modules.items())
              if k == "PyQt6" or k.startswith(("PyQt6.", "aetheris.ui"))}
-    for k in saved:                      # force fresh imports through the finder
+    for k in saved:
         del sys.modules[k]
     sys.meta_path.insert(0, finder)
     try:
@@ -61,10 +60,8 @@ def no_qt():
 
 
 def test_layout_imports_with_no_qt(no_qt):
-    # With PyQt6 blocked, the Qt widget module is genuinely unimportable...
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("aetheris.ui.treemap")
-    # ...yet the pure layout algorithm imports and computes a correct tiling.
     layout = importlib.import_module("aetheris.ui.treemap_layout")
     placed = layout.squarify([("a", 10), ("b", 20), ("c", 70)], 0, 0, 200, 100)
     assert len(placed) == 3

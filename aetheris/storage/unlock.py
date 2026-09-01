@@ -79,7 +79,6 @@ def find_lockers(target: str) -> list[Locker]:
     target_abs = os.path.abspath(target)
     lockers: list[Locker] = []
     for pid, name in handles.locking_processes(target_abs):
-        # Prefer the real image name when we can resolve it cheaply.
         try:
             name = psutil.Process(pid).name()
         except Exception:
@@ -120,9 +119,6 @@ def take_ownership(path: str) -> tuple[bool, str]:
         return False, "refused: path is inside a protected OS root"
     try:
         r1 = subprocess.run(["takeown", "/F", path], capture_output=True, text=True, timeout=30)
-        # Grant to the *SID* of the built-in Administrators group (S-1-5-32-544),
-        # not the literal name "administrators" -- the name is localized and the
-        # grant fails on non-English Windows.
         r2 = subprocess.run(
             ["icacls", path, "/grant", "*S-1-5-32-544:F"],
             capture_output=True, text=True, timeout=30,
@@ -171,7 +167,7 @@ def obliterate(path: str, confirm: bool, take_own: bool = False,
     if dryrun.skip(SRC, f"obliterate {path}"):
         return True, f"[dry-run] would delete {path}"
 
-    release_lockers(path, terminate=False)  # report, don't kill implicitly
+    release_lockers(path, terminate=False)
     if strip_handles_first:
         strip_handles(path)
     if take_own:

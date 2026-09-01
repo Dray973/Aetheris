@@ -47,8 +47,6 @@ class _WINTRUST_FILE_INFO(ctypes.Structure):
 
 
 class _WINTRUST_DATA(ctypes.Structure):
-    # The choice union is represented by the file pointer we use (all members
-    # are pointer-sized).
     _fields_ = [("cbStruct", wintypes.DWORD),
                 ("pPolicyCallbackData", ctypes.c_void_p),
                 ("pSIPClientData", ctypes.c_void_p),
@@ -64,7 +62,6 @@ class _WINTRUST_DATA(ctypes.Structure):
                 ("pSignatureSettings", ctypes.c_void_p)]
 
 
-# WINTRUST_ACTION_GENERIC_VERIFY_V2 {00AAC56B-CD44-11D0-8CC2-00C04FC295EE}
 _GENERIC_VERIFY_V2 = _GUID(0x00AAC56B, 0xCD44, 0x11D0,
                            (0x8C, 0xC2, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE))
 
@@ -96,7 +93,7 @@ if W.IS_WINDOWS:
         _kernel32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
                                           ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD,
                                           wintypes.HANDLE]
-        _kernel32.CreateFileW.restype = wintypes.HANDLE       # 64-bit-safe handle
+        _kernel32.CreateFileW.restype = wintypes.HANDLE
         _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
         _kernel32.CloseHandle.restype = wintypes.BOOL
     except OSError:  # pragma: no cover
@@ -143,7 +140,7 @@ def _verify(path: str) -> bool | None:
         return None
     if rc == _ERROR_SUCCESS:
         return True
-    return _in_catalog(path)      # catalog-signed OS files have no embedded sig
+    return _in_catalog(path)
 
 
 def _in_catalog(path: str) -> bool:

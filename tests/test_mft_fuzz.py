@@ -21,7 +21,7 @@ def test_parse_run_list_never_crashes_and_is_well_formed(buf, cluster):
         assert isinstance(e, tuple) and len(e) == 2
         off, length = e
         assert isinstance(off, int) and isinstance(length, int)
-        assert off >= 0 and length > 0        # only real, physical extents survive
+        assert off >= 0 and length > 0
 
 
 @settings(max_examples=500, deadline=None)
@@ -49,7 +49,5 @@ def test_parse_record_never_crashes_on_arbitrary_bytes(data):
 @settings(max_examples=800, deadline=None)
 @given(tail=st.binary(min_size=0, max_size=300))
 def test_parse_record_never_crashes_with_valid_signature(tail):
-    # Prefix a real FILE signature so the attribute walker is actually entered
-    # with attacker-controlled offsets/lengths -- the crash-prone path.
     out = mft._parse_record(b"FILE" + bytes(tail), 0)
     assert out is None or isinstance(out, mft.MftRecord)

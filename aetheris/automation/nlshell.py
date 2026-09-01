@@ -36,15 +36,12 @@ class CompiledCommand:
     intent: str
     explanation: str
     script: str
-    risk: str = "medium"       # low / medium / high
+    risk: str = "medium"
     requires_confirm: bool = True
     matched: bool = True
     warnings: list[str] = field(default_factory=list)
 
 
-# --------------------------------------------------------------------------
-# Intent handlers. Each returns a CompiledCommand or None (no match).
-# --------------------------------------------------------------------------
 def _find_and_move(text: str) -> CompiledCommand | None:
     m = re.search(
         r"find .*?(?P<ext>\b\w{2,5}\b)\s+(?:archives?|files?).*?"
@@ -56,8 +53,6 @@ def _find_and_move(text: str) -> CompiledCommand | None:
     ext = m.group("ext").lower().lstrip(".")
     if ext in {"zip", "archive"}:
         ext = "zip"
-    # Drive is extracted independently so a lazy quantifier can't skip it;
-    # accepts "on drive E", "drive E:", or "E:".
     drive = "C"
     dm = re.search(r"\bdrive\s+([a-zA-Z])\b|\b([a-zA-Z]):", text, re.IGNORECASE)
     if dm:
@@ -147,7 +142,6 @@ _STOP_NAMES = {"processes", "process", "background", "tasks", "apps",
 
 
 def _kill_by_name(text: str) -> CompiledCommand | None:
-    # Let the memory-threshold handler own size-based phrasing.
     if re.search(r"more than|less than|\b\d+\s*(gb|mb|kb)\b", text, re.IGNORECASE):
         return None
     m = re.search(
@@ -158,7 +152,7 @@ def _kill_by_name(text: str) -> CompiledCommand | None:
         return None
     name = m.group("name")
     if name.lower() in _STOP_NAMES:
-        return None                      # refuse "kill all processes" style
+        return None
     proc = name[:-4] if name.lower().endswith(".exe") else name
     script = (f"Get-Process -Name '{proc}' -ErrorAction SilentlyContinue | "
               f"Stop-Process -Force -Verbose")

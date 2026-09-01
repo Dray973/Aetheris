@@ -20,9 +20,9 @@ def test_chain_links_and_verifies():
     _fill(log, 5)
     recs = log.records()
     assert len(recs) == 5
-    assert recs[0].prev_hash == audit.GENESIS_HASH        # first links to genesis
+    assert recs[0].prev_hash == audit.GENESIS_HASH
     for prev, cur in pairwise(recs):
-        assert cur.prev_hash == prev.hash                 # each links to the prior
+        assert cur.prev_hash == prev.hash
         assert cur.seq == prev.seq + 1
     ok, bad = log.verify()
     assert ok and bad == -1
@@ -31,7 +31,6 @@ def test_chain_links_and_verifies():
 def test_tampering_with_a_message_breaks_the_chain():
     log = audit.AuditLog()
     _fill(log, 5)
-    # Forge record 2's message but keep its (now-stale) hash: verify must catch it.
     log._records[2] = dataclasses.replace(log._records[2], message="FORGED")
     ok, bad = log.verify()
     assert not ok and bad == 2
@@ -40,9 +39,9 @@ def test_tampering_with_a_message_breaks_the_chain():
 def test_deleting_a_record_breaks_the_chain():
     log = audit.AuditLog()
     _fill(log, 5)
-    del log._records[2]                                    # snip one out
+    del log._records[2]
     ok, bad = log.verify()
-    assert not ok                                         # prev_hash linkage broken
+    assert not ok
 
 
 def test_reordering_records_breaks_the_chain():
@@ -71,7 +70,6 @@ def test_on_disk_tamper_is_detected(tmp_path):
     log = audit.AuditLog(path=str(p))
     _fill(log, 4)
     log.close()
-    # Edit the persisted line for seq 1 without fixing its hash.
     lines = p.read_text(encoding="utf-8").splitlines()
     lines[1] = lines[1].replace("message 1", "message HACKED")
     p.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -81,13 +79,13 @@ def test_on_disk_tamper_is_detected(tmp_path):
 
 
 def test_verify_audit_log_file_clean_and_tampered(tmp_path):
-    p = tmp_path / "audit" / "session.jsonl"           # dir must be auto-created
+    p = tmp_path / "audit" / "session.jsonl"
     log = audit.AuditLog(path=str(p))
     _fill(log, 4)
     log.close()
     assert audit.verify_audit_log(str(p)) == (True, -1)
     lines = p.read_text(encoding="utf-8").splitlines()
-    lines[2] = lines[2].replace("message 2", "message X")   # forge seq 2, keep hash
+    lines[2] = lines[2].replace("message 2", "message X")
     p.write_text("\n".join(lines) + "\n", encoding="utf-8")
     assert audit.verify_audit_log(str(p)) == (False, 2)
 
@@ -98,13 +96,13 @@ def test_verify_audit_log_missing_file_is_false(tmp_path):
 
 def test_start_persistence_flushes_backlog_and_new(tmp_path):
     p = tmp_path / "audit" / "session.jsonl"
-    log = audit.AuditLog()                              # in-memory, no path yet
-    _fill(log, 2)                                       # backlog before persistence
+    log = audit.AuditLog()
+    _fill(log, 2)
     assert log.start_persistence(str(p))
-    log.append("ACTION", "srcN", "later event")        # one more after enabling
+    log.append("ACTION", "srcN", "later event")
     log.close()
     reloaded = audit.AuditLog.load(str(p))
-    assert len(reloaded) == 3                           # 2 backlog + 1 new persisted
+    assert len(reloaded) == 3
     assert reloaded.verify() == (True, -1)
 
 

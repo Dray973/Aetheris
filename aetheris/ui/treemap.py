@@ -15,7 +15,7 @@ from PyQt6.QtCore import QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
-from .treemap_layout import squarify  # pure geometry, Qt-free (see module)
+from .treemap_layout import squarify
 
 _PALETTE = ["#2b4a6f", "#356083", "#3f7690", "#4a8c9d", "#5aa0a0",
             "#6f9f7a", "#8a9f5f", "#a89a4e", "#b98a52", "#b5705e"]
@@ -46,7 +46,7 @@ class TreemapWidget(QWidget):
         super().__init__(parent)
         self.setMinimumHeight(280)
         self.setMouseTracking(True)
-        self._stack: list = []          # navigation stack of TreeNodes
+        self._stack: list = []
         self._tiles: list[_Tile] = []
         self._root = None
 
@@ -66,7 +66,6 @@ class TreemapWidget(QWidget):
     def path(self) -> str:
         return " \\ ".join(getattr(n, "name", "?") for n in self._stack)
 
-    # -- layout -------------------------------------------------------------
     def _relayout(self) -> None:
         self._tiles = []
         node = self.current()
@@ -98,7 +97,6 @@ class TreemapWidget(QWidget):
         super().resizeEvent(ev)
         self._relayout()
 
-    # -- paint --------------------------------------------------------------
     def paintEvent(self, ev) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
@@ -138,7 +136,6 @@ class TreemapWidget(QWidget):
         shown = len([t for t in self._tiles if not t.is_more])
         return max(len([c for c in node.children if c.total_size > 0]) - shown, 0)
 
-    # -- interaction --------------------------------------------------------
     def _hit(self, pos) -> _Tile | None:
         for t in self._tiles:
             if t.rect.contains(float(pos.x()), float(pos.y())):

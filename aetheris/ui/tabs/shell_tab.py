@@ -55,7 +55,6 @@ class ShellTab(QWidget):
         tabs.addTab(self._persistence_panel(), "Persistence Map")
         root.addWidget(tabs)
 
-    # -- autoruns -----------------------------------------------------------
     def _autoruns_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -122,7 +121,6 @@ class ShellTab(QWidget):
         self._toast(ok, msg)
         self._refresh_autoruns()
 
-    # -- services & drivers -------------------------------------------------
     def _services_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -257,7 +255,6 @@ class ShellTab(QWidget):
         if ok:
             self._refresh_services()
 
-    # -- scheduled tasks ----------------------------------------------------
     def _tasks_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -391,7 +388,6 @@ class ShellTab(QWidget):
         except OSError as exc:
             self._toast(False, str(exc))
 
-    # -- persistence map ----------------------------------------------------
     def _persistence_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -509,7 +505,6 @@ class ShellTab(QWidget):
         if ok:
             self._refresh_pm()
 
-    # -- registry diff ------------------------------------------------------
     def _diff_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -544,7 +539,6 @@ class ShellTab(QWidget):
         row.addWidget(self.diff_status)
         v.addLayout(row)
 
-        # -- snapshot history (auto-saved, point-in-time diffing) --
         hist = QHBoxLayout()
         self.keep_history = QCheckBox("auto-save snapshots to history")
         self.keep_history.setChecked(True)
@@ -565,7 +559,6 @@ class ShellTab(QWidget):
         self._refresh_history()
 
         views = QTabWidget()
-        # -- structured, color-coded, filterable change table --
         page = QWidget()
         pv = QVBoxLayout(page)
         self.diff_filter = QLineEdit(placeholderText="filter by key…")
@@ -577,7 +570,6 @@ class ShellTab(QWidget):
         self.diff_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         pv.addWidget(self.diff_table)
         views.addTab(page, "Changes")
-        # -- raw markdown --
         self.diff_out = QPlainTextEdit(readOnly=True)
         views.addTab(self.diff_out, "Markdown")
         v.addWidget(views)
@@ -610,7 +602,6 @@ class ShellTab(QWidget):
                                      self.subkey.text().strip(), tree)
             self._refresh_history()
 
-    # -- snapshot history ---------------------------------------------------
     def _refresh_history(self) -> None:
         self.history_combo.clear()
         self._history = registry.list_history()
@@ -713,7 +704,6 @@ class ShellTab(QWidget):
         except Exception as exc:  # noqa: BLE001
             self._toast(False, str(exc))
 
-    # -- privacy ------------------------------------------------------------
     def _privacy_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -738,14 +728,12 @@ class ShellTab(QWidget):
                                 "Stop and disable the DiagTrack service?") \
                 != QMessageBox.StandardButton.Yes:
             return
-        # Two `sc` calls at 30 s timeout each -> offload so the UI never freezes.
         self._run(registry.disable_diagtrack_service, self._show_diagtrack)
 
     def _show_diagtrack(self, res) -> None:
         ok, msg = res
         self._toast(ok, msg)
 
-    # -- context menu -------------------------------------------------------
     def _ctx_panel(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
@@ -797,8 +785,6 @@ class ShellTab(QWidget):
         if not ok or not spec.strip():
             return
         items = registry.parse_menu_spec(spec)
-        # If the pasted spec starts with the top label as the first root, use its
-        # children; otherwise treat all roots as the submenu's items.
         if len(items) == 1 and items[0].children:
             items = items[0].children
         good, msg = registry.add_cascading_menu(top.strip(), items)

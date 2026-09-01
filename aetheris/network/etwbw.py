@@ -33,8 +33,8 @@ from ..core import logbus
 SRC = "network.etwbw"
 
 EVENT_TRACE_REAL_TIME_MODE = 0x00000100
-EVENT_TRACE_SYSTEM_LOGGER_MODE = 0x02000000    # kernel events in a private session (Win8+)
-EVENT_TRACE_FLAG_NETWORK_TCPIP = 0x00010000    # SystemTraceProvider TcpIp/UdpIp group
+EVENT_TRACE_SYSTEM_LOGGER_MODE = 0x02000000
+EVENT_TRACE_FLAG_NETWORK_TCPIP = 0x00010000
 PROCESS_TRACE_MODE_REAL_TIME = 0x00000100
 PROCESS_TRACE_MODE_EVENT_RECORD = 0x10000000
 WNODE_FLAG_TRACED_GUID = 0x00020000
@@ -44,9 +44,8 @@ ERROR_ACCESS_DENIED = 5
 INVALID_HANDLE = 0xFFFFFFFFFFFFFFFF
 
 TRACEHANDLE = ctypes.c_ulonglong
-# Classic kernel TcpIp events identify send/recv by EVENT opcode (their Id is 0).
-SEND_OPCODES = frozenset({10, 26})     # TCP data sent, IPv4 / IPv6
-RECV_OPCODES = frozenset({11, 27})     # TCP data received, IPv4 / IPv6
+SEND_OPCODES = frozenset({10, 26})
+RECV_OPCODES = frozenset({11, 27})
 
 _advapi32 = ctypes.WinDLL("advapi32", use_last_error=True) if \
     __import__("sys").platform == "win32" else None
@@ -106,8 +105,6 @@ class EVENT_RECORD(ctypes.Structure):
 
 
 class EVENT_TRACE_LOGFILEW(ctypes.Structure):
-    # CurrentEvent (EVENT_TRACE, 88) and LogfileHeader (TRACE_LOGFILE_HEADER, 280)
-    # are opaque blobs of their exact x64 sizes so the callback fields land right.
     _fields_ = [("LogFileName", wintypes.LPWSTR), ("LoggerName", wintypes.LPWSTR),
                 ("CurrentTime", ctypes.c_longlong), ("BuffersRead", wintypes.DWORD),
                 ("ProcessTraceMode", wintypes.DWORD),
@@ -151,15 +148,13 @@ class EtwBandwidth:
         self._props_buf = None
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
-        self._totals: dict[int, list[int]] = {}     # pid -> [sent, recv] cumulative
+        self._totals: dict[int, list[int]] = {}
         self._prev: dict[int, tuple[int, int]] = {}
         self._t = time.monotonic()
-        # Keep the ctypes callback alive for the session's lifetime.
         self._cb = _EVENT_RECORD_CALLBACK(self._on_event)
         if _advapi32 is not None:
             self._start()
 
-    # -- session lifecycle --------------------------------------------------
     def _make_props(self):
         size = ctypes.sizeof(EVENT_TRACE_PROPERTIES) + 2 * (len(self.name) + 1) + 8
         buf = (ctypes.c_ubyte * size)()
@@ -167,12 +162,12 @@ class EtwBandwidth:
         p = props.contents
         p.Wnode.BufferSize = size
         p.Wnode.Flags = WNODE_FLAG_TRACED_GUID
-        p.Wnode.ClientContext = 1                    # QPC timestamps
+        p.Wnode.ClientContext = 1
         p.BufferSize = 128
         p.MinimumBuffers = 8
         p.MaximumBuffers = 32
-        p.FlushTimer = 1                             # flush real-time buffers every 1 s
-        p.EnableFlags = EVENT_TRACE_FLAG_NETWORK_TCPIP   # kernel TcpIp/UdpIp group
+        p.FlushTimer = 1
+        p.EnableFlags = EVENT_TRACE_FLAG_NETWORK_TCPIP
         p.LogFileMode = EVENT_TRACE_REAL_TIME_MODE | EVENT_TRACE_SYSTEM_LOGGER_MODE
         p.LoggerNameOffset = ctypes.sizeof(EVENT_TRACE_PROPERTIES)
         return buf, props
@@ -180,7 +175,7 @@ class EtwBandwidth:
     def _start(self) -> None:
         buf, props = self._make_props()
         rc = _advapi32.StartTraceW(ctypes.byref(self._session), self.name, props)
-        if rc == ERROR_ALREADY_EXISTS:               # clean up a stale session
+        if rc == ERROR_ALREADY_EXISTS:
             _advapi32.ControlTraceW(0, self.name, props, EVENT_TRACE_CONTROL_STOP)
             buf, props = self._make_props()
             rc = _advapi32.StartTraceW(ctypes.byref(self._session), self.name, props)
@@ -196,7 +191,7 @@ class EtwBandwidth:
         logfile.ProcessTraceMode = (PROCESS_TRACE_MODE_REAL_TIME |
                                     PROCESS_TRACE_MODE_EVENT_RECORD)
         logfile.EventRecordCallback = ctypes.cast(self._cb, ctypes.c_void_p)
-        self._logfile = logfile                       # keep alive
+        self._logfile = logfile
         self._htrace = _advapi32.OpenTraceW(ctypes.byref(logfile))
         if self._htrace == INVALID_HANDLE:
             self.status = f"OpenTrace failed (err={ctypes.get_last_error()})"
@@ -232,7 +227,6 @@ class EtwBandwidth:
         except Exception:
             pass
 
-    # -- event ingestion ----------------------------------------------------
     def _on_event(self, rec_ptr) -> None:
         try:
             rec = rec_ptr.contents
@@ -253,7 +247,6 @@ class EtwBandwidth:
         except Exception:
             pass
 
-    # -- sampling -----------------------------------------------------------
     def sample(self) -> dict[int, tuple[float, float]]:
         """Return {pid: (up_Bps, down_Bps)} since the previous sample."""
         if not self.available:

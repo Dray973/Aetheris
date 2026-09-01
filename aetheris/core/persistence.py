@@ -24,14 +24,14 @@ SRC = "core.persistence"
 
 @dataclass
 class PersistenceEntry:
-    source: str             # "Run" | "Startup" | "Service" | "Task"
+    source: str
     name: str
-    detail: str             # command / image path / action
-    location: str           # where it is configured
-    binary: str = ""        # resolved binary (for signing)
+    detail: str
+    location: str
+    binary: str = ""
     signed: str = "unknown"
     enabled: bool = True
-    ref: Any = None         # opaque handle for set_enabled dispatch
+    ref: Any = None
 
 
 def _binary_of(command: str) -> str:

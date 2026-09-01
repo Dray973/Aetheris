@@ -48,7 +48,6 @@ class LogDrawer(QWidget):
         self.level_box = QComboBox()
         for lv in _ORDER:
             self.level_box.addItem(lv.value, lv)
-        # Restore persisted verbosity + autoscroll.
         from ..core.settings import settings
         self._settings = settings()
         saved_level = self._settings.get("log_min_level", Level.TRACE.value)
@@ -71,7 +70,7 @@ class LogDrawer(QWidget):
 
         self.view = QPlainTextEdit()
         self.view.setReadOnly(True)
-        self.view.setMaximumBlockCount(5000)  # ring buffer
+        self.view.setMaximumBlockCount(5000)
         self.view.setFont(QFont("Cascadia Code", 10))
         root.addWidget(self.view)
 

@@ -63,7 +63,7 @@ def main() -> int:
 
     print(f"\nSampling per-process bandwidth over {args.secs:g}s "
           f"(generate some traffic — a download or video helps)…")
-    s.sample()                       # prime
+    s.sample()
     time.sleep(args.secs)
     rates = s.sample()
     active = {pid: (up, down) for pid, (up, down) in rates.items() if up or down}

@@ -55,7 +55,7 @@ def test_suspicion_flags_and_is_suspicious():
     assert "runs at logon/boot" in bad.flags
     assert ta.is_suspicious(bad)
 
-    weak = ta.parse_task_xml(_xml())          # signed logon task -> flagged but weak
+    weak = ta.parse_task_xml(_xml())
     weak.signed = "signed"
     weak.flags = ta.suspicion_flags(weak)
     assert weak.flags == ["runs at logon/boot"] and not ta.is_suspicious(weak)
@@ -86,7 +86,7 @@ def test_disable_task_registers_reverse_undo(monkeypatch):
     assert ok and calls[-1] == ("/change", "/tn", r"\Evil", "/disable")
     assert fresh.pending() == [r"task \Evil (disabled)"]
     fresh.panic()
-    assert calls[-1] == ("/change", "/tn", r"\Evil", "/enable")   # undo re-enabled it
+    assert calls[-1] == ("/change", "/tn", r"\Evil", "/enable")
 
 
 def test_task_remediation_honors_dry_run(monkeypatch):

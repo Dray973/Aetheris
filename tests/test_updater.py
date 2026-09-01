@@ -63,7 +63,7 @@ def test_check_github_finds_newer_and_picks_exe(monkeypatch):
     info = updater.check("github:owner/repo", current="0.1.0")
     assert info is not None
     assert info.version == "0.2.0"
-    assert info.url == "http://x/app.exe"        # skipped the setup.exe
+    assert info.url == "http://x/app.exe"
     assert info.notes == "release notes"
 
 
@@ -92,7 +92,6 @@ def test_check_and_stage_source_install_does_not_stage(tmp_path, monkeypatch):
     ok, msg = updater.check_and_stage("github:owner/repo")
     assert not ok
     assert "9.9.9" in msg and "source install" in msg
-    # No phantom pending state gets created.
     assert s.get("pending_update_version") == ""
 
 
@@ -105,13 +104,13 @@ def test_apply_pending_source_install_discards_stale_stage(tmp_path, monkeypatch
     s.update(pending_update_version="0.1.4")
     monkeypatch.setattr(updater, "settings", lambda: s)
     monkeypatch.setattr(updater, "staging_path", lambda: staged)
-    monkeypatch.setattr(updater, "current_exe", lambda: None)  # not frozen
+    monkeypatch.setattr(updater, "current_exe", lambda: None)
 
     assert updater.has_pending() is True
-    assert updater.apply_pending() is False        # nothing to relaunch
-    assert not staged.exists()                     # stale exe discarded
-    assert s.get("pending_update_version") == ""   # flag cleared
-    assert updater.has_pending() is False          # UI no longer nags
+    assert updater.apply_pending() is False
+    assert not staged.exists()
+    assert s.get("pending_update_version") == ""
+    assert updater.has_pending() is False
 
 
 def test_stage_rejects_checksum_mismatch(tmp_path, monkeypatch):

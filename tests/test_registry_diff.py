@@ -6,9 +6,9 @@ def test_diff_classifies_added_modified_removed():
     before = {"HKCU\\A": {"x": ("1", 1), "y": ("2", 1)}}
     after = {"HKCU\\A": {"x": ("9", 1), "z": ("3", 1)}}
     d = diff_trees(before, after)
-    assert any("x" in k for k in d.modified)     # value changed
-    assert any("z" in k for k in d.added)        # new value
-    assert any("y" in k for k in d.removed)      # deleted value
+    assert any("x" in k for k in d.modified)
+    assert any("z" in k for k in d.added)
+    assert any("y" in k for k in d.removed)
 
 
 def test_diff_markdown_sections():

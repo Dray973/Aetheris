@@ -6,7 +6,7 @@ def test_format_hex_layout():
     out = memvirt.format_hex(bytes(range(16)), 0x1000)
     line = out.splitlines()[0]
     assert line.startswith("0x000000001000  00 01 02 03")
-    assert line.endswith("." * 16)          # 0x00–0x0F are all non-printable
+    assert line.endswith("." * 16)
 
 
 def test_format_hex_ascii_column():

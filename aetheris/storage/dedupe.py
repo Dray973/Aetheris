@@ -65,7 +65,7 @@ def find_duplicates(roots: Iterable[str], min_size: int = 1) -> list[DuplicateGr
     groups: list[DuplicateGroup] = []
     for sz, paths in by_size.items():
         if len(paths) < 2:
-            continue  # unique size => cannot be a duplicate
+            continue
         by_hash: dict[str, list[str]] = defaultdict(list)
         for p in paths:
             digest = _hash_file(p)
@@ -82,7 +82,7 @@ def find_duplicates(roots: Iterable[str], min_size: int = 1) -> list[DuplicateGr
 
 @dataclass
 class Ghost:
-    kind: str          # "empty-dir" | "orphan-appdata"
+    kind: str
     path: str
     note: str = ""
 
@@ -91,8 +91,6 @@ def find_ghosts(roots: Iterable[str]) -> list[Ghost]:
     ghosts: list[Ghost] = []
     for root in roots:
         for dirpath, dirs, files in os.walk(root, topdown=False):
-            # topdown=False so we see leaves first; an empty leaf with no files
-            # and no surviving subdirs is a ghost.
             if not files and not dirs:
                 ghosts.append(Ghost("empty-dir", dirpath))
     logbus.trace(SRC, f"found {len(ghosts)} empty directory trees")

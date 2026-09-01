@@ -49,7 +49,6 @@ def render(size: int) -> QImage:
     p = QPainter(img)
     p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-    # Rounded background tile.
     inset = size * 0.04
     radius = size * 0.20
     p.setBrush(QBrush(BG))
@@ -59,7 +58,6 @@ def render(size: int) -> QImage:
 
     cx = cy = size / 2.0
 
-    # Soft glow behind the core.
     glow = QRadialGradient(cx, cy, size * 0.42)
     gc = QColor(CYAN); gc.setAlpha(70)
     glow.setColorAt(0.0, gc)
@@ -68,16 +66,13 @@ def render(size: int) -> QImage:
     p.setBrush(QBrush(glow))
     p.drawEllipse(QPointF(cx, cy), size * 0.42, size * 0.42)
 
-    # Accent orbit ring.
     p.setBrush(Qt.BrushStyle.NoBrush)
     p.setPen(QPen(GREEN, max(1.0, size * 0.028)))
     p.drawEllipse(QPointF(cx, cy), size * 0.34, size * 0.34)
 
-    # Hexagon "core" outline.
     p.setPen(QPen(CYAN, max(1.2, size * 0.07)))
     p.drawPolygon(_hexagon(cx, cy, size * 0.26))
 
-    # Center node.
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QBrush(CYAN))
     p.drawEllipse(QPointF(cx, cy), size * 0.09, size * 0.09)
@@ -98,11 +93,11 @@ def png_bytes(img: QImage) -> bytes:
 def build_ico(images: list[QImage]) -> bytes:
     blobs = [png_bytes(im) for im in images]
     n = len(blobs)
-    header = struct.pack("<HHH", 0, 1, n)          # reserved, type=icon, count
+    header = struct.pack("<HHH", 0, 1, n)
     entries = b""
     offset = 6 + 16 * n
-    for im, blob in zip(images, blobs, strict=True):   # one blob per image
-        w = im.width() if im.width() < 256 else 0   # 0 encodes 256
+    for im, blob in zip(images, blobs, strict=True):
+        w = im.width() if im.width() < 256 else 0
         h = im.height() if im.height() < 256 else 0
         entries += struct.pack(
             "<BBBBHHII", w, h, 0, 0, 1, 32, len(blob), offset)

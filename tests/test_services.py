@@ -6,7 +6,6 @@ import pytest
 from aetheris.core import services
 
 
-# -- pure helpers (no Windows needed) --------------------------------------
 def test_parse_binary_quoted_unquoted_and_driver():
     assert services.parse_binary('"C:\\Program Files\\App\\s.exe" -k x') \
         == r"C:\Program Files\App\s.exe"
@@ -44,7 +43,7 @@ def test_unquoted_path_detector():
     assert services.has_unquoted_path_vuln(r'"C:\Program Files\App\svc.exe"', "service") is False
     assert services.has_unquoted_path_vuln(
         r"C:\Windows\system32\svchost.exe -k net", "service") is False
-    assert services.has_unquoted_path_vuln(          # drivers are excluded
+    assert services.has_unquoted_path_vuln(
         r"C:\Program Files\App\svc.exe", "driver") is False
     assert services.has_unquoted_path_vuln(r"C:\NoSpace\svc.exe", "service") is False
 
@@ -55,7 +54,6 @@ def test_unquoted_path_issues_filter():
     assert services.unquoted_path_issues([a, b]) == [a]
 
 
-# -- reversible control (deterministic; sc.exe monkeypatched) --------------
 def test_stop_service_registers_reverse_undo(monkeypatch):
     from aetheris.core import safety
     calls = []
@@ -67,7 +65,7 @@ def test_stop_service_registers_reverse_undo(monkeypatch):
     assert ok and calls[-1] == ("stop", "Foo")
     assert fresh.pending() == ["service Foo (stopped)"]
     fresh.panic()
-    assert calls[-1] == ("start", "Foo")           # undo restarted it
+    assert calls[-1] == ("start", "Foo")
 
 
 def test_set_start_type_undo_restores_old(monkeypatch):
@@ -81,7 +79,7 @@ def test_set_start_type_undo_restores_old(monkeypatch):
     ok, _ = services.set_start_type("Bar", "disabled")
     assert ok and calls[-1] == ("config", "Bar", "start=", "disabled")
     fresh.panic()
-    assert calls[-1] == ("config", "Bar", "start=", "auto")   # restored prior type
+    assert calls[-1] == ("config", "Bar", "start=", "auto")
 
 
 def test_service_control_honors_dry_run(monkeypatch):
@@ -95,8 +93,8 @@ def test_service_control_honors_dry_run(monkeypatch):
         assert services.start_service("X")[0]
         assert services.stop_service("X")[0]
         assert services.set_start_type("X", "disabled")[0]
-    assert called["n"] == 0                         # sc never ran
-    assert fresh.pending() == []                    # nothing registered to undo
+    assert called["n"] == 0
+    assert fresh.pending() == []
 
 
 def test_set_start_type_rejects_unknown():
@@ -104,7 +102,6 @@ def test_set_start_type_rejects_unknown():
     assert not ok and "unknown" in msg.lower()
 
 
-# -- enumeration smoke (Windows) -------------------------------------------
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows SCM/registry")
 def test_enumerate_services_and_drivers_smoke():
     svcs = services.enumerate_services()
@@ -112,6 +109,6 @@ def test_enumerate_services_and_drivers_smoke():
     assert svcs[0].name and svcs[0].start_type and svcs[0].state
     drvs = services.enumerate_drivers()
     assert drvs and all(d.kind == "driver" for d in drvs)
-    assert any(d.state == "loaded" for d in drvs)        # some driver is loaded
-    for v in services.unquoted_path_issues(svcs):        # any hit is genuinely unquoted
+    assert any(d.state == "loaded" for d in drvs)
+    for v in services.unquoted_path_issues(svcs):
         assert " " in v.image_path and not v.image_path.strip().startswith('"')

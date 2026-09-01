@@ -44,7 +44,7 @@ def squarify(items, x, y, w, h):
             row.append(scaled[i])
             i += 1
         row_area = sum(a for _n, a in row)
-        if w <= h:                                  # lay a horizontal strip
+        if w <= h:
             rh = row_area / w if w else 0
             rx = x
             for n, a in row:
@@ -53,7 +53,7 @@ def squarify(items, x, y, w, h):
                 rx += rw
             y += rh
             h -= rh
-        else:                                       # lay a vertical strip
+        else:
             rw = row_area / h if h else 0
             ry = y
             for n, a in row:

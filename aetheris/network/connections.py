@@ -39,9 +39,9 @@ class Connection:
     status: str
     family: str
     kind: str
-    remote_class: str = ""   # loopback / private / reserved / public
+    remote_class: str = ""
     rdns: str = ""
-    geo: str = ""            # e.g. "US · Ashburn" when a GeoLite2 DB is present
+    geo: str = ""
 
 
 def _classify(ip: str) -> str:
