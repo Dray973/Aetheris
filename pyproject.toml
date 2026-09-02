@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aetheris-quantum-core"
-version = "0.1.5"
+version = "0.1.6"
 description = "Aetheris Quantum Core — Advanced Systems Instrumentation Suite"
 readme = "README.md"
 requires-python = ">=3.10"
