@@ -37,6 +37,7 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File agent\build.ps1
 
       - name: Build the native scan lib (Rust)
+        continue-on-error: true   # optional accelerator — nativescan falls back to pure Python
         run: powershell -ExecutionPolicy Bypass -File native\build.ps1
 
       - name: Build one-file executable

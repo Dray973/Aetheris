@@ -9,11 +9,13 @@
 // hook forwards to the real function and returns its result unchanged.
 //
 // Each event carries the immediate caller (module+offset, via _ReturnAddress)
-// so the analyst sees *who* made the call, not just that it happened.
+// so the analyst sees *who* made the call, not just that it happened. The DLL
+// stays resident and loops one session per host attach, so re-attaching to the
+// same process works.
 //
-// Scope (v1): catches statically-imported calls (the common case). Calls made
-// through a hand-resolved GetProcAddress pointer are not covered — that needs
-// inline hooking (a later iteration). Honest by design.
+// Scope: catches statically-imported calls (the common case). Calls made through
+// a hand-resolved GetProcAddress pointer are not covered — that needs inline
+// hooking (a later iteration). Honest by design.
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
@@ -32,6 +34,7 @@ namespace {
 HMODULE g_self = nullptr;          // our own module — never patch it
 HANDLE  g_pipe = INVALID_HANDLE_VALUE;
 HANDLE  g_stop = nullptr;          // host sets this to request un-hook
+HANDLE  g_go = nullptr;            // host sets this to start a session (re-attach)
 CRITICAL_SECTION g_write_cs;       // serialises pipe writes (hooks are multi-threaded)
 CRITICAL_SECTION g_patch_cs;
 DWORD   g_tls = TLS_OUT_OF_INDEXES;  // per-thread "already logging" guard
@@ -303,20 +306,27 @@ void remove_hooks() {
 DWORD WINAPI worker(LPVOID) {
     wchar_t pipe[128];
     swprintf_s(pipe, L"\\\\.\\pipe\\aetheris_agent_%u", GetCurrentProcessId());
-    for (int i = 0; i < 50 && g_pipe == INVALID_HANDLE_VALUE; ++i) {
-        HANDLE h = CreateFileW(pipe, GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-        if (h != INVALID_HANDLE_VALUE) { g_pipe = h; break; }
-        if (GetLastError() != ERROR_PIPE_BUSY) Sleep(100);
-        else WaitNamedPipeW(pipe, 500);
+    // One session per host attach. The DLL stays resident and loops here, so a
+    // re-attach to the same process works (LoadLibrary on an already-loaded DLL
+    // never re-runs DllMain). Between sessions we block on g_go (no polling); on
+    // stop we un-hook and wait for the next attach. No unload → no unload race.
+    for (;;) {
+        WaitForSingleObject(g_go, INFINITE);   // host signals a new session
+        for (int i = 0; i < 50 && g_pipe == INVALID_HANDLE_VALUE; ++i) {
+            HANDLE h = CreateFileW(pipe, GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+            if (h != INVALID_HANDLE_VALUE) { g_pipe = h; break; }
+            if (GetLastError() == ERROR_PIPE_BUSY) WaitNamedPipeW(pipe, 500);
+            else Sleep(100);
+        }
+        if (g_pipe == INVALID_HANDLE_VALUE) continue;   // host pipe never came up
+        ResetEvent(g_stop);
+        install_hooks();
+        WaitForSingleObject(g_stop, INFINITE);
+        remove_hooks();
+        EnterCriticalSection(&g_write_cs);
+        if (g_pipe != INVALID_HANDLE_VALUE) { CloseHandle(g_pipe); g_pipe = INVALID_HANDLE_VALUE; }
+        LeaveCriticalSection(&g_write_cs);
     }
-    if (g_pipe == INVALID_HANDLE_VALUE) return 0;   // host not listening; stay inert
-    install_hooks();
-    WaitForSingleObject(g_stop, INFINITE);
-    remove_hooks();
-    EnterCriticalSection(&g_write_cs);
-    if (g_pipe != INVALID_HANDLE_VALUE) { CloseHandle(g_pipe); g_pipe = INVALID_HANDLE_VALUE; }
-    LeaveCriticalSection(&g_write_cs);
-    return 0;
 }
 
 }  // namespace
@@ -330,7 +340,9 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_patch_cs);
         wchar_t ev[128];
         swprintf_s(ev, L"aetheris_agent_stop_%u", GetCurrentProcessId());
-        g_stop = CreateEventW(nullptr, TRUE, FALSE, ev);
+        g_stop = CreateEventW(nullptr, TRUE, FALSE, ev);        // manual-reset
+        swprintf_s(ev, L"aetheris_agent_go_%u", GetCurrentProcessId());
+        g_go = CreateEventW(nullptr, FALSE, FALSE, ev);         // auto-reset session trigger
         CreateThread(nullptr, 0, worker, nullptr, 0, nullptr);
     } else if (reason == DLL_PROCESS_DETACH) {
         if (g_stop) SetEvent(g_stop);

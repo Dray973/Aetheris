@@ -185,11 +185,15 @@ _MEM_RELEASE = 0x8000
 _PIPE_ACCESS_INBOUND = 0x00000001
 _PIPE_TYPE_BYTE = 0x00000000
 _EVENT_MODIFY_STATE = 0x0002
-_INVALID = -1
 
 if IS_WINDOWS:
     import ctypes
     from ctypes import wintypes
+
+    # INVALID_HANDLE_VALUE as a HANDLE (c_void_p) restype comes back as the
+    # unsigned pointer value (0xFFFF…FFFF), never Python's -1 — so compare
+    # against that, not -1.
+    _INVALID = ctypes.c_void_p(-1).value
 
     _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     _k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
@@ -315,6 +319,13 @@ class AgentSession:
         if not ok:
             self.stop()
             return False, msg
+        # Signal the agent to begin a session. The DLL is resident and loops one
+        # session per attach (DllMain runs only on first load), so this "go" is
+        # what starts monitoring on every attach — including a re-attach.
+        go = _k32.OpenEventW(_EVENT_MODIFY_STATE, False, f"aetheris_agent_go_{self.pid}")
+        if go:
+            _k32.SetEvent(go)
+            _k32.CloseHandle(go)
         logbus.action(SRC, f"API monitor attached to {self.name} (pid {self.pid})")
         return True, f"attached to {self.name} (pid {self.pid})"
 
