@@ -30,6 +30,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 from PyQt6.QtCore import QEventLoop  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 
+from aetheris.analysis.findings import Finding  # noqa: E402
 from aetheris.core import timeline as tl  # noqa: E402
 from aetheris.core.persistence import PersistenceEntry  # noqa: E402
 from aetheris.core.services import ServiceInfo  # noqa: E402
@@ -264,13 +265,50 @@ def main() -> None:
     dbg.out.appendPlainText(memvirt.format_hex(_code, base_addr=0x7FF6A1B2C3D0))
     w.tabs.setCurrentIndex(7); pump(0.3); shot("09-debugger.png")
 
-    plugins_tab = w.tabs.widget(8)
+    hunt = w.tabs.widget(8)
+    hunt._populate([
+        Finding(key="helper.exe", subject="helper.exe (pid 9002)",
+                title="Correlated (4 signals): masquerading, c2, persistence, injection",
+                score=100, category="correlated", technique="T1055",
+                technique_name="Masquerading; App Layer Protocol; Autostart; Injection",
+                evidence=["• Suspicious process: unsigned + temp/download directory [T1036]",
+                          "    exe: C:\\Users\\user\\AppData\\Local\\Temp\\helper.exe",
+                          "    Authenticode: unsigned",
+                          "• Public outbound connection from an unsigned process [T1071]",
+                          "    185.220.101.5:443 (RU · Moscow)",
+                          "• Autostart persistence (unsigned) from temp [T1547]",
+                          "    location: HKCU\\...\\CurrentVersion\\Run",
+                          "• PE image in private memory (possible injected module) [T1055]",
+                          "    region: 0x1a2b0000 +0x40000"],
+                actions=["kill pid 9002", "isolate helper.exe", "disable Helper"]),
+        Finding(key="upc", subject="UpcElevationService (service)",
+                title="Unquoted service path (privilege-escalation candidate)",
+                score=40, category="privesc", technique="T1574.009",
+                technique_name="Path Interception (Unquoted Path)",
+                evidence=["ImagePath: C:\\Program Files\\Vendor\\upc.exe", "start: auto"]),
+        Finding(key="synctask", subject="SyncTask (task)",
+                title="Suspicious scheduled task: obfuscated/encoded shell command",
+                score=45, category="persistence", technique="T1053.005",
+                technique_name="Scheduled Task",
+                evidence=["task: \\Vendor\\SyncTask", "triggers: logon",
+                          "action: powershell -enc SQBFAFgA..."],
+                actions=["disable task \\Vendor\\SyncTask"]),
+        Finding(key="wcast.exe", subject="wcast.exe (pid 3576)",
+                title="Suspicious process: unsigned", score=30, category="masquerading",
+                technique="T1036", technique_name="Masquerading",
+                evidence=["exe: C:\\Tools\\wcast.exe", "Authenticode: unsigned"],
+                actions=["kill pid 3576"]),
+    ])
+    hunt.table.selectRow(0)
+    w.tabs.setCurrentIndex(8); pump(0.4); shot("10-hunt.png")
+
+    plugins_tab = w.tabs.widget(9)
     for i in range(plugins_tab.list.count()):
         if plugins_tab.list.item(i).text().startswith("system-gauges"):
             plugins_tab.list.setCurrentRow(i)
             plugins_tab._run()
             break
-    w.tabs.setCurrentIndex(8); pump(0.5); shot("10-plugins.png")
+    w.tabs.setCurrentIndex(9); pump(0.5); shot("11-plugins.png")
 
     if "--gif" in sys.argv:
         _build_gif()
@@ -285,7 +323,8 @@ def _build_gif() -> None:
         return
     order = ["01-memory.png", "02-storage-treemap.png", "03-network.png",
              "04-services.png", "05-persistence.png", "06-timeline.png",
-             "07-autoshell.png", "08-dma.png", "09-debugger.png", "10-plugins.png"]
+             "07-autoshell.png", "08-dma.png", "09-debugger.png", "10-hunt.png",
+             "11-plugins.png"]
     imgs = []
     for f in order:
         im = Image.open(OUT / f).convert("RGB")

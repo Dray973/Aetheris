@@ -12,10 +12,13 @@ control.
 > **Service & Driver Inspector** (with an unquoted-service-path privesc finder),
 > a **Scheduled-Task auditor**, a unified **Startup / Persistence Map**, a
 > session **Timeline / state-diff**, real **Authenticode** verification, a
-> **Plugin API v2** (declared permissions + a hash trust-list), and a scrubbed
-> **crash reporter**. Every write is confirm-gated, reversible via PANIC, audited,
+> **Plugin API v2** (declared permissions + a hash trust-list), a scrubbed
+> **crash reporter**, a live process **Debugger** (attach · breakpoints · registers),
+> a PCILeech **DMA** physical-memory workspace, and a cross-module **Threat-Hunt**
+> engine that correlates everything into ranked, **MITRE ATT&CK**-tagged findings.
+> Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 202 tests. Optional native
+> pass `mypy --strict` + `ruff` and are covered by 210 tests. Optional native
 > engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
 > data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
 > status* below rather than pretending to be complete.
@@ -33,7 +36,8 @@ place of live machine data):
 | ![Network](docs/screenshots/03-network.png) **③ Network / Firewall** — socket→process table with GeoIP + per-process B/s columns, live throughput chart, "Nuke" isolation. | ![Services](docs/screenshots/04-services.png) **④ Service & Driver Inspector** — services + kernel drivers with signed/loaded status and **unquoted-service-path** privesc candidates (red); reversible start/stop/start-type. |
 | ![Persistence](docs/screenshots/05-persistence.png) **⑤ Persistence Map** — one screen unifying Run/Startup + auto/boot services + logon/boot tasks; reversible enable/disable. | ![Timeline](docs/screenshots/06-timeline.png) **⑥ Session Timeline** — periodic state snapshots; diff *any two* points (processes/ports/connections/autoruns added·removed). |
 | ![Auto-Shell](docs/screenshots/07-autoshell.png) **⑦ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. | ![DMA](docs/screenshots/08-dma.png) **⑧ DMA / Physical** — PCILeech **FPGA** (Artix-7 100T) physical-memory read + a **guarded DMA write** (dry-run, audited, PANIC-reversible) over MemProcFS; controls stay disabled until a writable device is attached. |
-| ![Debugger](docs/screenshots/09-debugger.png) **⑨ Debugger** — attach to a running process as a real debugger: software **breakpoints**, memory + x64 **register** read/write, single-step, live debug events; attach + writes confirmed, dry-run-aware, PANIC-reversible. | ![Plugins](docs/screenshots/10-plugins.png) **⚙ Plugins v2** — text + widget tools with a declared **permission scope** and a hash **trust** state; untrusted runs are gated. |
+| ![Debugger](docs/screenshots/09-debugger.png) **⑨ Debugger** — attach to a running process as a real debugger: software **breakpoints**, memory + x64 **register** read/write, single-step, live debug events; attach + writes confirmed, dry-run-aware, PANIC-reversible. | ![Threat Hunt](docs/screenshots/10-hunt.png) **🎯 Threat Hunt** — correlate processes, network, persistence, tasks, services + memory injection into ranked, **MITRE ATT&CK**-tagged findings; the same binary showing up as unsigned + temp + public-C2 + persistence collapses into one **critical** finding with evidence and reversible responses. |
+| ![Plugins](docs/screenshots/11-plugins.png) **⚙ Plugins v2** — text + widget tools with a declared **permission scope** and a hash **trust** state; untrusted runs are gated. | |
 
 Regenerate with `python docs/make_screenshots.py --gif`. For a live, auto-
 cycling demo to screen-record, run `python docs/demo_mode.py`. The layered
@@ -48,7 +52,10 @@ aetheris/
 │                  timeline, plugins, scheduler, settings, reports, crash reporter
 ├── forensics/     process autopsy (+ signature), RAM matrix, Capstone/Keystone studio,
 │                  PCILeech-FPGA physical read + guarded DMA write (memvirt/dma),
-│                  live debugger — attach + breakpoints + registers (debugger)
+│                  live debugger — attach + breakpoints + registers (debugger),
+│                  in-memory injection scan — RWX / unbacked-exec / private-PE (injection)
+├── analysis/      threat-hunt findings engine — correlate every module into ranked,
+│                  ATT&CK-tagged findings (findings)
 ├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator, handle strip
 ├── network/       socket→process interceptor, per-process B/s (ETW), GeoIP, firewall isolation
 ├── automation/    natural-language → reviewed PowerShell compiler
@@ -58,7 +65,7 @@ aetheris/
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (202 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (210 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ## Install & run
@@ -99,7 +106,7 @@ features and degrade gracefully when absent (the UI tells you what's missing).
 
 ```powershell
 pip install .[test]
-pytest                                 # 202 tests over the cores
+pytest                                 # 210 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
@@ -270,6 +277,7 @@ attaches everything to the GitHub Release automatically.
 | ⑥ Timeline | periodic lightweight snapshots (processes, listening ports, connections, autoruns); **diff any two points** in the session (added·removed), registry-diff-style table; pairs with the persistent audit log | — |
 | ⑦ DMA / Physical | **guarded DMA-write pipeline** — dry-run rehearsal, a before-bytes snapshot, tamper-evident audit, and PANIC-reversible rollback, behind a confirm-gated UI whose read/write controls stay disabled until a *writable* device attaches; the write / rollback / dry-run / read-only-refusal paths are unit-tested against a fake backend | **PCILeech FPGA physical read + write** (Artix-7 **100T** and similar) over **MemProcFS/LeechCore** — needs the `memprocfs` lib, the LeechCore/FTDI drivers, the card's PCILeech firmware, and an elevated token; not exercised by CI |
 | ⑧ Debugger | **live debugger** attach (`DebugActiveProcess` + SeDebugPrivilege): software breakpoints, memory + x64 register read/write, single-step, and a debug-event loop (DLL loads / exceptions / output). Attach + writes are confirmed, dry-run-aware, audited and PANIC-reversible; system-critical processes are refused; clean detach leaves the target running. The pure core (breakpoint save/restore, event decoding, RIP fix-up, trap-flag math) is unit-tested, and the native attach → breakpoint-hit → register-read → re-arm → detach loop was verified live against a self-spawned target (9/9) | needs a token that can debug the target (SeDebugPrivilege for other-user/elevated processes); refuses `lsass`/`csrss`/… |
+| 🎯 Threat Hunt | **cross-module correlation engine** (`analysis/findings.py`): pulls process autopsy (+ Authenticode), connections (+ GeoIP), the persistence map, scheduled tasks, services, and an in-memory **injection scan** (RWX / unbacked-exec / private-PE, `forensics/injection.py`) into a single **ranked** list of findings — each tagged with a **MITRE ATT&CK** technique and reversible responses. The correlation is the point: signals about the same binary merge into one high-severity finding. Detectors + injection classifier + the merge are pure and unit-tested; verified live on a real machine | injection scan needs an elevated token to open other processes; heuristic (flags candidates, not verdicts) |
 | ⚙ Plugins v2 | text + widget tools (built-in + user `*.py`), runnable in-app and via `aetheris-cli`; each declares a **permission scope** and carries a **trust** state (built-in / trusted / modified / untrusted, via a hash trust-list); untrusted runs are confirm-gated — **disclosure + provenance, not a sandbox** | — |
 
 Environment-gated items report their status in the UI (e.g. the per-process
