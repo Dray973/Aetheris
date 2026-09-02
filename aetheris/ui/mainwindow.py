@@ -31,6 +31,7 @@ from ..core import audit, dryrun, logbus, privileges, report, safety
 from ..core.settings import settings
 from .logdrawer import LogDrawer
 from .tabs.autoshell_tab import AutoShellTab
+from .tabs.debugger_tab import DebuggerTab
 from .tabs.dma_tab import DmaTab
 from .tabs.memory_tab import MemoryTab
 from .tabs.network_tab import NetworkTab
@@ -262,6 +263,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(AutoShellTab(), "⑤  Auto-Shell (NL)")
         self.tabs.addTab(TimelineTab(), "⑥  Timeline")
         self.tabs.addTab(DmaTab(), "⑦  DMA / Physical")
+        self.tabs.addTab(DebuggerTab(), "⑧  Debugger")
         self.tabs.addTab(PluginsTab(), "⚙  Plugins")
         self.setCentralWidget(self.tabs)
 
