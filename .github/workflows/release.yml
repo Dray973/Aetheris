@@ -36,6 +36,9 @@ jobs:
       - name: Build the API-monitor agent DLL (MSVC)
         run: powershell -ExecutionPolicy Bypass -File agent\build.ps1
 
+      - name: Build the native scan lib (Rust)
+        run: powershell -ExecutionPolicy Bypass -File native\build.ps1
+
       - name: Build one-file executable
         run: pyinstaller --noconfirm --clean aetheris.spec
 

@@ -120,7 +120,7 @@ module = ["aetheris.core.winapi", "aetheris.core.signing",
           "aetheris.network.firewall", "aetheris.storage.handles",
           "aetheris.forensics.disasm", "aetheris.forensics.memvirt",
           "aetheris.forensics.debugger", "aetheris.forensics.yarascan",
-          "aetheris.forensics.apimonitor"]
+          "aetheris.forensics.apimonitor", "aetheris.forensics.nativescan"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]

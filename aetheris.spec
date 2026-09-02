@@ -50,6 +50,11 @@ datas = [("aetheris/ui/assets/aetheris.ico", "aetheris/ui/assets")]
 if os.path.exists("dist/aetheris_agent.dll"):
     datas.append(("dist/aetheris_agent.dll", "."))
 
+# Bundle the native (Rust) scan accelerator if built (native/build.ps1 →
+# dist/aetheris_scan.dll). Optional — nativescan.py falls back to pure Python.
+if os.path.exists("dist/aetheris_scan.dll"):
+    datas.append(("dist/aetheris_scan.dll", "."))
+
 a = Analysis(
     ["run.py"],
     pathex=[],

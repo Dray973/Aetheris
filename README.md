@@ -24,7 +24,7 @@ control.
 > no installer re-run required.
 > Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 239 tests. Optional native
+> pass `mypy --strict` + `ruff` and are covered by 245 tests. Optional native
 > engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
 > data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
 > status* below rather than pretending to be complete.
@@ -61,7 +61,8 @@ aetheris/
 │                  live debugger — attach + breakpoints + registers (debugger),
 │                  in-memory injection scan — RWX / unbacked-exec / private-PE (injection),
 │                  optional YARA scanning of process memory + files (yarascan),
-│                  in-process API monitor — host side of the injected agent (apimonitor)
+│                  in-process API monitor — host side of the injected agent (apimonitor),
+│                  native entropy + byte-pattern scan with a pure-Python fallback (nativescan)
 ├── analysis/      threat-hunt findings engine — correlate every module into ranked,
 │                  ATT&CK-tagged findings (findings)
 ├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator, handle strip
@@ -71,10 +72,11 @@ aetheris/
 ├── cli.py         headless forensic capture (`aetheris-cli`, also `<exe> cli …`)
 └── ui/            PyQt6 window, theme, dropdown module navigator (tabdeck), log drawer, module tabs
 agent/             native C++ API-monitor agent DLL (injected) + its build script
+native/            native Rust scan lib (entropy + memmem, cdylib) + its build script
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (239 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (245 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ## Install & run
@@ -115,7 +117,7 @@ additional features and degrade gracefully when absent (the UI tells you what's 
 
 ```powershell
 pip install .[test]
-pytest                                 # 239 tests over the cores
+pytest                                 # 245 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell

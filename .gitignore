@@ -20,3 +20,6 @@ dist/
 # OS / editor
 Thumbs.db
 .vscode/
+
+# Rust build artifacts
+native/**/target/

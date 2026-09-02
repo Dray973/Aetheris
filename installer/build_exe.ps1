@@ -79,6 +79,12 @@ try {
 } catch {
     Write-Host "  ! agent DLL build skipped ($($_.Exception.Message))" -ForegroundColor Yellow
 }
+try {
+    Write-Step "Building native scan lib (Rust)"
+    & (Join-Path $repo 'native\build.ps1')
+} catch {
+    Write-Host "  ! native scan lib skipped ($($_.Exception.Message))" -ForegroundColor Yellow
+}
 
 # 2. Compile
 # Build intermediates go to TEMP (never inside a synced OneDrive folder, which
