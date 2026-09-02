@@ -13,9 +13,11 @@ jobs:
     name: Build Windows downloadables
     runs-on: windows-latest
     env:
-      # Set these repo secrets to Authenticode-sign the outputs (optional).
-      SIGN_PFX_BASE64: ${{ secrets.SIGN_PFX_BASE64 }}
-      SIGN_PASSWORD: ${{ secrets.SIGN_PASSWORD }}
+      # Azure Trusted Signing: set these repo secrets to sign the release
+      # binaries with a SmartScreen-trusted cert. Unset => unsigned build.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
@@ -49,32 +51,49 @@ jobs:
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
           Stop-Process -Id $p.Id -Force
 
+      - name: Sign the app exe (Azure Trusted Signing)
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\dist
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
       - name: Compile installer (AetherisSetup.exe)
         run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\aetheris.iss'
 
+      - name: Sign the installer (Azure Trusted Signing)
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\installer\Output
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       - name: Collect artifacts
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null
           Copy-Item dist\AetherisQuantumCore.exe artifacts\
           Copy-Item installer\Output\AetherisSetup.exe artifacts\
-
-      - name: Sign binaries (optional — needs SIGN_PFX_BASE64 secret)
-        if: ${{ env.SIGN_PFX_BASE64 != '' }}
-        run: |
-          $pfx = Join-Path $env:RUNNER_TEMP 'aetheris-cert.pfx'
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_BASE64))
-          $st = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse `
-                  -Filter signtool.exe | Where-Object FullName -match '\\x64\\' |
-                  Sort-Object FullName -Descending | Select-Object -First 1
-          foreach ($f in 'artifacts\AetherisQuantumCore.exe','artifacts\AetherisSetup.exe') {
-            & $st.FullName sign /f $pfx /p $env:SIGN_PASSWORD /fd SHA256 `
-              /tr http://timestamp.digicert.com /td SHA256 $f
-            if ($LASTEXITCODE -ne 0) { throw "signing failed: $f" }
-          }
-          Remove-Item $pfx -Force
 
       - name: Generate update manifest (version.json)
         run: |
