@@ -6,13 +6,18 @@ from ..core.logbus import Level
 QSS = """
 * { font-family: 'Segoe UI', 'Cascadia Code', sans-serif; font-size: 12px; }
 QMainWindow, QWidget { background: #0b0e14; color: #c8d3f5; }
-QTabWidget::pane { border: 1px solid #1c2333; top: -1px; }
+QTabWidget::pane { border: none; border-top: 1px solid #223049; background: #0b0e14; }
+QTabBar { qproperty-drawBase: 0; background: #090c12; }
 QTabBar::tab {
-    background: #11151f; color: #7a88b8; padding: 8px 18px;
-    border: 1px solid #1c2333; border-bottom: none;
+    background: transparent; color: #6f7d9c;
+    padding: 9px 20px; margin: 0;
+    border: none; border-top: 2px solid transparent;
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
 }
-QTabBar::tab:selected { background: #0b0e14; color: #7dd3fc; }
-QTabBar::tab:hover { color: #c8d3f5; }
+QTabBar::tab:hover:!selected { color: #b7c3e8; background: #0e1522; }
+QTabBar::tab:selected {
+    color: #eaf0ff; background: #121a2b; border-top: 2px solid #7dd3fc;
+}
 QPushButton {
     background: #16203a; color: #c8d3f5; border: 1px solid #274060;
     padding: 6px 14px; border-radius: 4px;

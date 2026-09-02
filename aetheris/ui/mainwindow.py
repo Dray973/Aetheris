@@ -268,6 +268,9 @@ class MainWindow(QMainWindow):
 
     def _build_tabs(self) -> None:
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.tabBar().setExpanding(False)
         self.tabs.addTab(MemoryTab(), "①  Memory / Process Autopsy")
         self.tabs.addTab(StorageTab(), "②  Storage Surgery / MFT")
         self.tabs.addTab(NetworkTab(), "③  Network / Firewall")
