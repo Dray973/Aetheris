@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 from aetheris.core import timeline as tl  # noqa: E402
 from aetheris.core.persistence import PersistenceEntry  # noqa: E402
 from aetheris.core.services import ServiceInfo  # noqa: E402
-from aetheris.forensics import memvirt  # noqa: E402
+from aetheris.forensics import debugger, memvirt  # noqa: E402
 from aetheris.forensics.memvirt import Capabilities  # noqa: E402
 from aetheris.forensics.processes import ProcessInfo  # noqa: E402
 from aetheris.network.connections import Connection  # noqa: E402
@@ -235,13 +235,42 @@ def main() -> None:
     dma_tab.out.appendPlainText("✓ wrote 4 bytes @ 0x1a2b3040")
     w.tabs.setCurrentIndex(6); pump(0.4); shot("08-dma.png")
 
-    plugins_tab = w.tabs.widget(7)
+    dbg = w.tabs.widget(7)
+    dbg.status.setText("attached to target.exe (pid 8321) — stopped at breakpoint")
+    dbg.attach_btn.setEnabled(False)
+    dbg.detach_btn.setEnabled(True)
+    dbg.cont_btn.setEnabled(True)
+    dbg.step_btn.setEnabled(True)
+    dbg.bp_addr.setText("7ff6a1b2c3d0")
+    dbg.mem_addr.setText("7ff6a1b2c3d0")
+    dbg.bp_list.setText("0x7ff6a1b2c3d0  0x7ff6a1b2c4a0")
+    regs = {"Rax": 1, "Rbx": 0x7FF6A1B30000, "Rcx": 0xC4E5AFF740, "Rdx": 0,
+            "Rsi": 0x7FF6A1B2C3D0, "Rdi": 0x140, "Rbp": 0xC4E5AFF8A0, "Rsp": 0xC4E5AFF720,
+            "Rip": 0x7FF6A1B2C3D0, "R8": 0, "R9": 0x7FFCE0000000, "R10": 0, "R11": 0x246,
+            "R12": 0, "R13": 0, "R14": 0, "R15": 0, "EFlags": 0x202}
+    for ev in ("[create-process] tid 4102", "[load-dll] tid 4102  ntdll.dll",
+               "[breakpoint] tid 4102 @ 0x7ff6a1b2c3d0"):
+        dbg.out.appendPlainText(ev)
+    dbg.out.appendPlainText("── registers ──")
+    _rline = []
+    for _i, _r in enumerate(debugger.X64_REGISTERS, 1):
+        _rline.append(f"{_r:<6} 0x{regs.get(_r, 0):016x}")
+        if _i % 3 == 0:
+            dbg.out.appendPlainText("  ".join(_rline)); _rline = []
+    if _rline:
+        dbg.out.appendPlainText("  ".join(_rline))
+    _code = bytes.fromhex("48895c2408 4889742410 57 4883ec20 488bda 488bf9 e8a4120000".replace(" ", ""))
+    dbg.out.appendPlainText("── read @ 0x7ff6a1b2c3d0 (64 bytes) ──")
+    dbg.out.appendPlainText(memvirt.format_hex(_code, base_addr=0x7FF6A1B2C3D0))
+    w.tabs.setCurrentIndex(7); pump(0.3); shot("09-debugger.png")
+
+    plugins_tab = w.tabs.widget(8)
     for i in range(plugins_tab.list.count()):
         if plugins_tab.list.item(i).text().startswith("system-gauges"):
             plugins_tab.list.setCurrentRow(i)
             plugins_tab._run()
             break
-    w.tabs.setCurrentIndex(7); pump(0.5); shot("09-plugins.png")
+    w.tabs.setCurrentIndex(8); pump(0.5); shot("10-plugins.png")
 
     if "--gif" in sys.argv:
         _build_gif()
@@ -256,7 +285,7 @@ def _build_gif() -> None:
         return
     order = ["01-memory.png", "02-storage-treemap.png", "03-network.png",
              "04-services.png", "05-persistence.png", "06-timeline.png",
-             "07-autoshell.png", "08-dma.png", "09-plugins.png"]
+             "07-autoshell.png", "08-dma.png", "09-debugger.png", "10-plugins.png"]
     imgs = []
     for f in order:
         im = Image.open(OUT / f).convert("RGB")

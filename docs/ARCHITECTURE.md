@@ -16,7 +16,7 @@ flowchart TB
     end
 
     subgraph FEAT["feature layers · decoupled, no cross-imports"]
-        F["forensics<br/>processes · memory · disasm · memvirt · dma"]
+        F["forensics<br/>processes · memory · disasm · memvirt · dma · debugger"]
         S["storage<br/>mft · dedupe · unlock · handles"]
         N["network<br/>connections · firewall · etwbw · procbw · geoip"]
         A["automation<br/>nlshell"]
@@ -103,7 +103,7 @@ sequenceDiagram
 | core | `settings` / `report` / `plugins` / `scheduler` | persisted prefs; CSV/JSON/HTML/MD serializers; text+widget plugin discovery (+ permissions/trust); Task Scheduler integration |
 | core | `autoruns` / `updater` | logon/boot autostart enum + reversible disable; self-update (manifest check → stage → apply-on-next-launch) |
 | — | `cli` / `plugins/*` | headless `aetheris-cli` capture; built-in extension tools (incl. a GUI widget plugin) |
-| forensics | `processes` / `memory` / `disasm` / `memvirt` / `dma` | autopsy, RAM matrix, Capstone/Keystone, VM scanner backends, PCILeech-FPGA physical read + guarded DMA write |
+| forensics | `processes` / `memory` / `disasm` / `memvirt` / `dma` / `debugger` | autopsy, RAM matrix, Capstone/Keystone, VM scanner backends, PCILeech-FPGA physical read + guarded DMA write, live debugger (attach + breakpoints + regs) |
 | storage | `mft` / `dedupe` / `unlock` / `handles` | MFT parse + tree-map, dedupe/ghosts, Restart-Manager lockers, handle stripping |
 | network | `connections` / `firewall` / `etwbw` / `procbw` / `geoip` | socket→PID, INetFwPolicy2 isolation, ETW per-proc B/s (EStats fallback), offline GeoIP |
 | automation | `nlshell` | deterministic NL → reviewed PowerShell |
