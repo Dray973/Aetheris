@@ -101,7 +101,7 @@ sequenceDiagram
 | core | `timeline` | session state snapshots + any-two-point diff |
 | core | `crashreport` | scrubbed last-resort excepthook crash file |
 | core | `settings` / `report` / `plugins` / `scheduler` | persisted prefs; CSV/JSON/HTML/MD serializers; text+widget plugin discovery (+ permissions/trust); Task Scheduler integration |
-| core | `autoruns` / `updater` | logon/boot autostart enum + reversible disable; self-update (manifest check → stage → apply-on-next-launch) — the frozen exe swaps its own file, a source/venv install mirrors freshly-downloaded source over itself (a git checkout is left to git) |
+| core | `autoruns` / `updater` | logon/boot autostart enum + reversible disable; self-update (manifest check → stage → apply-on-next-launch) — the frozen exe swaps its own file, a source/venv install mirrors freshly-downloaded source over itself and pip-refreshes its `.venv` when requirements change (a git checkout is left to git) |
 | — | `cli` / `plugins/*` | headless `aetheris-cli` capture; built-in extension tools (incl. a GUI widget plugin) |
 | forensics | `processes` / `memory` / `disasm` / `memvirt` / `dma` / `debugger` / `injection` / `yarascan` | autopsy, RAM matrix, Capstone/Keystone, VM scanner backends, PCILeech-FPGA physical read + guarded DMA write, live debugger (attach + breakpoints + regs), in-memory injection scan (RWX / unbacked-exec / private-PE), optional YARA scanning of process memory + files |
 | analysis | `findings` | threat-hunt correlation engine — merges signals from every layer into ranked, MITRE ATT&CK-tagged findings (sits above the feature layers, like the UI) |

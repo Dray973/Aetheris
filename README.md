@@ -18,10 +18,11 @@ control.
 > engine that correlates everything into ranked, **MITRE ATT&CK**-tagged findings,
 > and a built-in **auto-updater** that self-updates *in place* — the standalone
 > exe swaps itself, and a source/venv install now downloads + mirrors the new
-> source over itself (keeping your `.venv`), no installer re-run required.
+> source over itself (refreshing the `.venv` with pip when dependencies change),
+> no installer re-run required.
 > Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 224 tests. Optional native
+> pass `mypy --strict` + `ruff` and are covered by 227 tests. Optional native
 > engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
 > data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
 > status* below rather than pretending to be complete.
@@ -69,7 +70,7 @@ aetheris/
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (224 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (227 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ## Install & run
@@ -110,7 +111,7 @@ additional features and degrade gracefully when absent (the UI tells you what's 
 
 ```powershell
 pip install .[test]
-pytest                                 # 224 tests over the cores
+pytest                                 # 227 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
