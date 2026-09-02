@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO))
 OUT = REPO / "docs" / "screenshots"
 OUT.mkdir(parents=True, exist_ok=True)
 
-from PyQt6.QtCore import QEventLoop  # noqa: E402
+from PyQt6.QtCore import QEventLoop, QTimer  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 
 from aetheris.analysis.findings import Finding  # noqa: E402
@@ -71,11 +71,34 @@ def _inner_tab(widget, label: str) -> None:
                 return
 
 
+def freeze(tab) -> None:
+    """Stop a tab's live refresh so the synthetic data we inject can't be
+    overwritten by an in-flight async snapshot — which would leak *real* machine
+    data (usernames, exe paths, remote IPs) into the committed README images.
+    Stops every timer and disconnects + awaits any running background worker."""
+    for t in tab.findChildren(QTimer):
+        t.stop()
+    worker = getattr(tab, "_worker", None)
+    if worker is not None:
+        try:
+            worker.done.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+        try:
+            worker.wait(3000)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def main() -> None:
     pump(1.5)
+    # Quiesce every tab BEFORE injecting synthetic data (see freeze() — this is
+    # what keeps real machine data out of the screenshots).
+    for _i in range(w.tabs.count()):
+        freeze(w.tabs.widget(_i))
+    pump(0.1)  # drain any already-queued (now-disconnected) worker callbacks
 
     mem = w.tabs.widget(0)
-    mem._timer.stop()
     mem._populate([
         ProcessInfo(1234, "chrome.exe", "DESKTOP\\user",
                     r"C:\Program Files\Google\Chrome\chrome.exe",
