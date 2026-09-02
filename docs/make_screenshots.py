@@ -295,20 +295,29 @@ def main() -> None:
     apimon.proc.clear()
     apimon.proc.addItem("  4020  suspicious.exe", 4020)
     apimon._session = type("_S", (), {"name": "suspicious.exe"})()
-    apimon._on_event(ApiEvent("__ready__", fields={"hooks": 4}))
+    apimon._on_event(ApiEvent("__ready__", fields={"hooks": 6}))
     _api_events = [
-        ApiEvent("CreateFileW", 4102, {"path": r"C:\Users\user\AppData\Local\Temp\stage.tmp"}),
-        ApiEvent("VirtualAlloc", 4102, {"size": 0x10000, "protect": 0x40}),
-        ApiEvent("WriteProcessMemory", 4102, {"size": 3584, "pid": 4020}),
-        ApiEvent("LoadLibraryW", 4102, {"path": "ntdll.dll"}),
-        ApiEvent("CreateFileW", 4102, {"path": r"\\.\pipe\status_7f2a"}),
-        ApiEvent("VirtualAlloc", 5210, {"size": 4096, "protect": 0x04}),
-        ApiEvent("LoadLibraryW", 5210, {"path": "wininet.dll"}),
-        ApiEvent("CreateFileW", 5210, {"path": r"C:\Windows\System32\drivers\etc\hosts"}),
-        ApiEvent("WriteProcessMemory", 4102, {"size": 512, "pid": 4020}),
-        ApiEvent("VirtualAlloc", 4102, {"size": 0x2000, "protect": 0x40}),
-        ApiEvent("LoadLibraryW", 4102, {"path": "crypt32.dll"}),
-        ApiEvent("CreateFileW", 5210, {"path": r"C:\Users\user\Documents\ledger.xlsx"}),
+        ApiEvent("CreateFileW", 4102, {"path": r"C:\Users\user\AppData\Local\Temp\stage.tmp",
+                                       "caller": "suspicious.exe+0x14a2"}),
+        ApiEvent("VirtualAlloc", 4102, {"size": 0x10000, "protect": 0x40,
+                                        "caller": "suspicious.exe+0x1620"}),
+        ApiEvent("WriteProcessMemory", 4102, {"size": 3584, "pid": 4020,
+                                              "caller": "suspicious.exe+0x1744"}),
+        ApiEvent("LoadLibraryW", 4102, {"path": "ntdll.dll", "caller": "suspicious.exe+0x18b0"}),
+        ApiEvent("CreateProcessW", 4102, {"app": "", "cmdline": "powershell -enc SQBFAFgA…",
+                                          "caller": "suspicious.exe+0x1b30"}),
+        ApiEvent("VirtualAlloc", 5210, {"size": 4096, "protect": 0x04,
+                                        "caller": "ntdll.dll+0x9f21"}),
+        ApiEvent("LoadLibraryW", 5210, {"path": "wininet.dll", "caller": "suspicious.exe+0x1117"}),
+        ApiEvent("connect", 5210, {"endpoint": "185.220.101.5:443",
+                                   "caller": "wininet.dll+0x2210"}),
+        ApiEvent("WriteProcessMemory", 4102, {"size": 512, "pid": 4020,
+                                              "caller": "suspicious.exe+0x1744"}),
+        ApiEvent("VirtualAlloc", 4102, {"size": 0x2000, "protect": 0x40,
+                                        "caller": "suspicious.exe+0x1620"}),
+        ApiEvent("CreateFileW", 5210, {"path": r"C:\Users\user\Documents\ledger.xlsx",
+                                       "caller": "suspicious.exe+0x14a2"}),
+        ApiEvent("connect", 4102, {"endpoint": "20.60.40.4:443", "caller": "crypt32.dll+0x88c1"}),
     ]
     for _ev in _api_events:
         apimon._on_event(_ev)

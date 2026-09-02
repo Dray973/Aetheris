@@ -32,6 +32,18 @@ def test_describe_variants():
     assert "a=1  b=2" in am.ApiEvent("Foo", fields={"b": 2, "a": 1}).describe()
 
 
+def test_describe_caller_process_and_network():
+    d = am.ApiEvent("CreateProcessW", 1,
+                    {"app": "", "cmdline": "cmd.exe /c exit", "caller": "t.exe+0x1"}).describe()
+    assert "cmd.exe /c exit" in d and d.endswith("t.exe+0x1")
+    d = am.ApiEvent("connect", 1,
+                    {"endpoint": "127.0.0.1:9999", "caller": "ws2_32.dll+0x40"}).describe()
+    assert "127.0.0.1:9999" in d and "ws2_32.dll+0x40" in d
+    # caller renders as a trailing "← …" tail, not folded into the generic k=v list
+    d = am.ApiEvent("CreateFileW", 1, {"path": "C:/x", "caller": "u.dll+0x9"}).describe()
+    assert d == "CreateFileW  C:/x   \u2190 u.dll+0x9"
+
+
 def test_protect_name():
     assert am.protect_name(0x40) == "EXECUTE_READWRITE"
     assert am.protect_name(0x04) == "READWRITE"

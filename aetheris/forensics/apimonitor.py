@@ -61,14 +61,22 @@ class ApiEvent:
         f = self.fields
         if self.api == "__ready__":
             return f"agent ready — {f.get('hooks', 0)} hook(s) installed"
+        caller = f.get("caller")
+        tail = f"   ← {caller}" if caller else ""
         if "path" in f:
-            return f"{self.api}  {f['path']}"
-        if self.api == "VirtualAlloc":
-            return f"{self.api}  size={f.get('size', 0)}  protect={protect_name(int(f.get('protect', 0)))}"
-        if self.api == "WriteProcessMemory":
-            return f"{self.api}  size={f.get('size', 0)}  → pid {f.get('pid', '?')}"
-        extra = "  ".join(f"{k}={v}" for k, v in sorted(f.items()))
-        return f"{self.api}  {extra}".rstrip()
+            base = f"{self.api}  {f['path']}"
+        elif self.api == "CreateProcessW":
+            base = f"{self.api}  {f.get('app', '')} {f.get('cmdline', '')}".rstrip()
+        elif self.api == "connect":
+            base = f"{self.api}  {f.get('endpoint', '')}"
+        elif self.api == "VirtualAlloc":
+            base = f"{self.api}  size={f.get('size', 0)}  protect={protect_name(int(f.get('protect', 0)))}"
+        elif self.api == "WriteProcessMemory":
+            base = f"{self.api}  size={f.get('size', 0)}  → pid {f.get('pid', '?')}"
+        else:
+            extra = "  ".join(f"{k}={v}" for k, v in sorted(f.items()) if k != "caller")
+            base = f"{self.api}  {extra}".rstrip()
+        return base + tail
 
 
 def parse_event(line: str) -> ApiEvent | None:

@@ -35,10 +35,12 @@ from ..workers import Worker
 SRC = "ui.apimonitor"
 MAX_ROWS = 5000
 
-# API → row tint, so injection-relevant calls stand out.
+# API → row tint, so injection-/spawn-/network-relevant calls stand out.
 _API_COLOR = {
     "WriteProcessMemory": "#ff8a80",
+    "CreateProcessW": "#ff8a80",
     "VirtualAlloc": "#e0b341",
+    "connect": "#5ee0a0",
     "LoadLibraryW": "#7dd3fc",
     "CreateFileW": "#9fb0e0",
 }
