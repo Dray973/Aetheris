@@ -6,7 +6,7 @@ natural-language automation shell into one dashboard. It targets power users,
 security researchers, and systems administrators operating on machines they
 control.
 
-> **Status: v0.1.9.** A strictly decoupled architecture, a persistent
+> **Status: v0.2.0.** A strictly decoupled architecture, a persistent
 > tamper-evident (hash-chained) audit log, a global **dry-run** rehearsal mode,
 > and the Omega-Rollback safety shield back every module. The dozen modules are
 > reached from a single compact **dropdown navigator**. Recent additions: a
