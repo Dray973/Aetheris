@@ -280,7 +280,9 @@ class DebugSession:
         self._stopped_tid = 0
         self._hproc = None
         self._bps = BreakpointManager(self._read_mem_raw, self._write_mem_raw)
-        self._lock = threading.Lock()
+        self._pending_rearm: int | None = None
+        self._expect_step = False
+        self._step_mode = False
 
     # -- lifecycle ----------------------------------------------------------
     def attach(self) -> tuple[bool, str]:
@@ -467,56 +469,64 @@ class DebugSession:
         rec = evt.u.Exception.ExceptionRecord
         excode = int(rec.ExceptionCode)
         addr = int(rec.ExceptionAddress or 0)
+        if excode == EXCEPTION_SINGLE_STEP and self._expect_step:
+            self._expect_step = False
+            if self._pending_rearm is not None:
+                self._write_mem_raw(self._pending_rearm, bytes([BREAKPOINT_BYTE]))
+                self._pending_rearm = None
+            if self._step_mode:
+                self._step_mode = False
+                return self._stop_and_wait(tid, addr, "single-step", fixup=False)
+            return DBG_CONTINUE
         if excode == EXCEPTION_BREAKPOINT and self._bps.is_ours(addr):
-            return self._handle_breakpoint(tid, addr)
+            self._bps.on_hit(addr)
+            return self._stop_and_wait(tid, addr, "breakpoint", fixup=True)
         if excode == EXCEPTION_BREAKPOINT:
             return DBG_CONTINUE
         self._emit(decode_event(code, excode), tid, addr,
                    "first-chance" if evt.u.Exception.dwFirstChance else "last-chance")
         return DBG_EXCEPTION_NOT_HANDLED
 
-    def _handle_breakpoint(self, tid: int, addr: int) -> int:
-        self._bps.on_hit(addr)
+    def _stop_and_wait(self, tid: int, addr: int, kind: str, fixup: bool) -> int:
+        """Report a stop, block until the UI resumes, then set up the resume:
+        step over a live breakpoint (restore byte + trap flag + re-arm) or
+        single-step, honouring continue/step."""
         self._stopped_tid = tid
-        hthr = W.kernel32.OpenThread(THREAD_ALL, False, tid)
-        if hthr:
-            try:
-                ctx = CONTEXT()
-                ctx.ContextFlags = CONTEXT_FULL
-                if W.kernel32.GetThreadContext(hthr, ctypes.byref(ctx)):
-                    ctx.Rip = rip_after_break(int(ctx.Rip))
-                    W.kernel32.SetThreadContext(hthr, ctypes.byref(ctx))
-            finally:
-                W.kernel32.CloseHandle(hthr)
-        self._emit("breakpoint", tid, addr)
-        mode = "continue"
+        if fixup:
+            self._with_context(tid, lambda c: setattr(c, "Rip", rip_after_break(int(c.Rip))))
+        self._emit(kind, tid, addr)
         try:
             mode = self._resume.get(timeout=600)
         except queue.Empty:
-            pass
+            mode = "continue"
         self._stopped_tid = 0
         if self._stop.is_set():
             return DBG_CONTINUE
         bp = self._bps.get(addr)
         if bp is not None and bp.original_byte is not None:
             self._write_mem_raw(addr, bytes([bp.original_byte]))
-            self._single_step_over(tid, addr, rearm=(mode != "step"))
+            self._pending_rearm = addr
+        else:
+            self._pending_rearm = None
+        if mode == "step" or self._pending_rearm is not None:
+            self._with_context(tid, lambda c: setattr(c, "EFlags", set_trap_flag(int(c.EFlags))))
+            self._expect_step = True
+            self._step_mode = (mode == "step")
         return DBG_CONTINUE
 
-    def _single_step_over(self, tid: int, addr: int, rearm: bool) -> None:
+    def _with_context(self, tid: int, mutate: Callable[[CONTEXT], None]) -> bool:
         hthr = W.kernel32.OpenThread(THREAD_ALL, False, tid)
         if not hthr:
-            return
+            return False
         try:
             ctx = CONTEXT()
             ctx.ContextFlags = CONTEXT_FULL
-            if W.kernel32.GetThreadContext(hthr, ctypes.byref(ctx)):
-                ctx.EFlags = set_trap_flag(int(ctx.EFlags))
-                W.kernel32.SetThreadContext(hthr, ctypes.byref(ctx))
+            if not W.kernel32.GetThreadContext(hthr, ctypes.byref(ctx)):
+                return False
+            mutate(ctx)
+            return bool(W.kernel32.SetThreadContext(hthr, ctypes.byref(ctx)))
         finally:
             W.kernel32.CloseHandle(hthr)
-        if rearm:
-            self._write_mem_raw(addr, bytes([BREAKPOINT_BYTE]))
 
 
 def can_debug(name: str) -> bool:
