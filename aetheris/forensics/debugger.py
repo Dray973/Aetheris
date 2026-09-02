@@ -380,26 +380,20 @@ class DebugSession:
             return False, "target is not stopped"
         if dryrun.skip(SRC, f"set {name}=0x{value:x} in pid {self.pid}"):
             return True, f"[dry-run] would set {name}=0x{value:x}"
-        hthr = W.kernel32.OpenThread(THREAD_ALL, False, tid)
-        if not hthr:
-            return False, "OpenThread failed"
-        try:
-            ctx = CONTEXT()
-            ctx.ContextFlags = CONTEXT_FULL
-            if not W.kernel32.GetThreadContext(hthr, ctypes.byref(ctx)):
-                return False, "GetThreadContext failed"
-            prior = int(getattr(ctx, name))
-            setattr(ctx, name, value)
-            if not W.kernel32.SetThreadContext(hthr, ctypes.byref(ctx)):
-                return False, "SetThreadContext failed"
-            logbus.action(SRC, f"set {name}=0x{value:x} in pid {self.pid}",
-                          f"was 0x{prior:x}")
-            safety.ledger.register(
-                f"debug reg {name} (pid {self.pid})",
-                lambda p=prior: self.set_register(name, p, tid))
-            return True, f"{name} = 0x{value:x}"
-        finally:
-            W.kernel32.CloseHandle(hthr)
+        prior: list[int] = []
+
+        def _mut(c: CONTEXT) -> None:
+            prior.append(int(getattr(c, name)))
+            setattr(c, name, value)
+
+        if not self._with_context(tid, _mut):
+            return False, "set register failed"
+        was = prior[0] if prior else 0
+        logbus.action(SRC, f"set {name}=0x{value:x} in pid {self.pid}", f"was 0x{was:x}")
+        safety.ledger.register(
+            f"debug reg {name} (pid {self.pid})",
+            lambda p=was: self._with_context(tid, lambda c: setattr(c, name, p)))
+        return True, f"{name} = 0x{value:x}"
 
     # -- breakpoints --------------------------------------------------------
     def set_breakpoint(self, address: int) -> tuple[bool, str]:
