@@ -35,6 +35,7 @@ from aetheris.core import timeline as tl  # noqa: E402
 from aetheris.core.persistence import PersistenceEntry  # noqa: E402
 from aetheris.core.services import ServiceInfo  # noqa: E402
 from aetheris.forensics import debugger, memvirt  # noqa: E402
+from aetheris.forensics.apimonitor import ApiEvent  # noqa: E402
 from aetheris.forensics.memvirt import Capabilities  # noqa: E402
 from aetheris.forensics.processes import ProcessInfo  # noqa: E402
 from aetheris.network.connections import Connection  # noqa: E402
@@ -260,6 +261,8 @@ def main() -> None:
     w.tabs.setCurrentIndex(6); pump(0.4); shot("08-dma.png")
 
     dbg = w.tabs.widget(7)
+    dbg.proc.clear()
+    dbg.proc.addItem("  8321  target.exe", 8321)
     dbg.status.setText("attached to target.exe (pid 8321) — stopped at breakpoint")
     dbg.attach_btn.setEnabled(False)
     dbg.detach_btn.setEnabled(True)
@@ -288,7 +291,30 @@ def main() -> None:
     dbg.out.appendPlainText(memvirt.format_hex(_code, base_addr=0x7FF6A1B2C3D0))
     w.tabs.setCurrentIndex(7); pump(0.3); shot("09-debugger.png")
 
-    hunt = w.tabs.widget(8)
+    apimon = w.tabs.widget(8)
+    apimon.proc.clear()
+    apimon.proc.addItem("  4020  suspicious.exe", 4020)
+    apimon._session = type("_S", (), {"name": "suspicious.exe"})()
+    apimon._on_event(ApiEvent("__ready__", fields={"hooks": 4}))
+    _api_events = [
+        ApiEvent("CreateFileW", 4102, {"path": r"C:\Users\user\AppData\Local\Temp\stage.tmp"}),
+        ApiEvent("VirtualAlloc", 4102, {"size": 0x10000, "protect": 0x40}),
+        ApiEvent("WriteProcessMemory", 4102, {"size": 3584, "pid": 4020}),
+        ApiEvent("LoadLibraryW", 4102, {"path": "ntdll.dll"}),
+        ApiEvent("CreateFileW", 4102, {"path": r"\\.\pipe\status_7f2a"}),
+        ApiEvent("VirtualAlloc", 5210, {"size": 4096, "protect": 0x04}),
+        ApiEvent("LoadLibraryW", 5210, {"path": "wininet.dll"}),
+        ApiEvent("CreateFileW", 5210, {"path": r"C:\Windows\System32\drivers\etc\hosts"}),
+        ApiEvent("WriteProcessMemory", 4102, {"size": 512, "pid": 4020}),
+        ApiEvent("VirtualAlloc", 4102, {"size": 0x2000, "protect": 0x40}),
+        ApiEvent("LoadLibraryW", 4102, {"path": "crypt32.dll"}),
+        ApiEvent("CreateFileW", 5210, {"path": r"C:\Users\user\Documents\ledger.xlsx"}),
+    ]
+    for _ev in _api_events:
+        apimon._on_event(_ev)
+    w.tabs.setCurrentIndex(8); pump(0.4); shot("10-apimonitor.png")
+
+    hunt = w.tabs.widget(9)
     hunt._populate([
         Finding(key="helper.exe", subject="helper.exe (pid 9002)",
                 title="Correlated (4 signals): masquerading, c2, persistence, injection",
@@ -323,15 +349,15 @@ def main() -> None:
                 actions=["kill pid 3576"]),
     ])
     hunt.table.selectRow(0)
-    w.tabs.setCurrentIndex(8); pump(0.4); shot("10-hunt.png")
+    w.tabs.setCurrentIndex(9); pump(0.4); shot("11-hunt.png")
 
-    plugins_tab = w.tabs.widget(9)
+    plugins_tab = w.tabs.widget(10)
     for i in range(plugins_tab.list.count()):
         if plugins_tab.list.item(i).text().startswith("system-gauges"):
             plugins_tab.list.setCurrentRow(i)
             plugins_tab._run()
             break
-    w.tabs.setCurrentIndex(9); pump(0.5); shot("11-plugins.png")
+    w.tabs.setCurrentIndex(10); pump(0.5); shot("12-plugins.png")
 
     if "--gif" in sys.argv:
         _build_gif()
@@ -346,8 +372,8 @@ def _build_gif() -> None:
         return
     order = ["01-memory.png", "02-storage-treemap.png", "03-network.png",
              "04-services.png", "05-persistence.png", "06-timeline.png",
-             "07-autoshell.png", "08-dma.png", "09-debugger.png", "10-hunt.png",
-             "11-plugins.png"]
+             "07-autoshell.png", "08-dma.png", "09-debugger.png",
+             "10-apimonitor.png", "11-hunt.png", "12-plugins.png"]
     imgs = []
     for f in order:
         im = Image.open(OUT / f).convert("RGB")

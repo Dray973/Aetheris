@@ -6,9 +6,10 @@ natural-language automation shell into one dashboard. It targets power users,
 security researchers, and systems administrators operating on machines they
 control.
 
-> **Status: v0.1.8.** A strictly decoupled architecture, a persistent
+> **Status: v0.1.9.** A strictly decoupled architecture, a persistent
 > tamper-evident (hash-chained) audit log, a global **dry-run** rehearsal mode,
-> and the Omega-Rollback safety shield back every module. Recent additions: a
+> and the Omega-Rollback safety shield back every module. The dozen modules are
+> reached from a single compact **dropdown navigator**. Recent additions: a
 > **Service & Driver Inspector** (with an unquoted-service-path privesc finder),
 > a **Scheduled-Task auditor**, a unified **Startup / Persistence Map**, a
 > session **Timeline / state-diff**, real **Authenticode** verification, a
@@ -16,13 +17,14 @@ control.
 > **crash reporter**, a live process **Debugger** (attach · breakpoints · registers),
 > a PCILeech **DMA** physical-memory workspace, a cross-module **Threat-Hunt**
 > engine that correlates everything into ranked, **MITRE ATT&CK**-tagged findings,
-> and a built-in **auto-updater** that self-updates *in place* — the standalone
+> an in-process **API Monitor** (inject a native agent to watch a target's Win32
+> calls), and a built-in **auto-updater** that self-updates *in place* — the standalone
 > exe swaps itself, and a source/venv install now downloads + mirrors the new
 > source over itself (refreshing the `.venv` with pip when dependencies change),
 > no installer re-run required.
 > Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 227 tests. Optional native
+> pass `mypy --strict` + `ruff` and are covered by 233 tests. Optional native
 > engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
 > data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
 > status* below rather than pretending to be complete.
@@ -40,8 +42,8 @@ place of live machine data):
 | ![Network](docs/screenshots/03-network.png) **③ Network / Firewall** — socket→process table with GeoIP + per-process B/s columns, live throughput chart, "Nuke" isolation. | ![Services](docs/screenshots/04-services.png) **④ Service & Driver Inspector** — services + kernel drivers with signed/loaded status and **unquoted-service-path** privesc candidates (red); reversible start/stop/start-type. |
 | ![Persistence](docs/screenshots/05-persistence.png) **⑤ Persistence Map** — one screen unifying Run/Startup + auto/boot services + logon/boot tasks; reversible enable/disable. | ![Timeline](docs/screenshots/06-timeline.png) **⑥ Session Timeline** — periodic state snapshots; diff *any two* points (processes/ports/connections/autoruns added·removed). |
 | ![Auto-Shell](docs/screenshots/07-autoshell.png) **⑦ Auto-Shell** — plain-English → reviewed PowerShell with an intent/risk label and a mandatory confirm gate. | ![DMA](docs/screenshots/08-dma.png) **⑧ DMA / Physical** — PCILeech **FPGA** (Artix-7 100T) physical-memory read + a **guarded DMA write** (dry-run, audited, PANIC-reversible) over MemProcFS; controls stay disabled until a writable device is attached. |
-| ![Debugger](docs/screenshots/09-debugger.png) **⑨ Debugger** — attach to a running process as a real debugger: software **breakpoints**, memory + x64 **register** read/write, single-step, live debug events; attach + writes confirmed, dry-run-aware, PANIC-reversible. | ![Threat Hunt](docs/screenshots/10-hunt.png) **🎯 Threat Hunt** — correlate processes, network, persistence, tasks, services + memory injection into ranked, **MITRE ATT&CK**-tagged findings; the same binary showing up as unsigned + temp + public-C2 + persistence collapses into one **critical** finding with evidence and reversible responses. |
-| ![Plugins](docs/screenshots/11-plugins.png) **⚙ Plugins v2** — text + widget tools with a declared **permission scope** and a hash **trust** state; untrusted runs are gated. | |
+| ![Debugger](docs/screenshots/09-debugger.png) **⑨ Debugger** — attach to a running process as a real debugger: software **breakpoints**, memory + x64 **register** read/write, single-step, live debug events; attach + writes confirmed, dry-run-aware, PANIC-reversible. | ![API Monitor](docs/screenshots/10-apimonitor.png) **⑩ API Monitor** — inject a native in-process agent to **observe** a target's Win32 calls (file / library / memory: CreateFileW · LoadLibraryW · VirtualAlloc · WriteProcessMemory) streamed live; the agent only watches — it never alters a call. Confirm-gated, audited, refuses system-critical processes. |
+| ![Threat Hunt](docs/screenshots/11-hunt.png) **🎯 Threat Hunt** — correlate processes, network, persistence, tasks, services + memory injection into ranked, **MITRE ATT&CK**-tagged findings; the same binary showing up as unsigned + temp + public-C2 + persistence collapses into one **critical** finding with evidence and reversible responses. | ![Plugins](docs/screenshots/12-plugins.png) **⚙ Plugins v2** — text + widget tools with a declared **permission scope** and a hash **trust** state; untrusted runs are gated. |
 
 Regenerate with `python docs/make_screenshots.py --gif`. For a live, auto-
 cycling demo to screen-record, run `python docs/demo_mode.py`. The layered
@@ -58,7 +60,8 @@ aetheris/
 │                  PCILeech-FPGA physical read + guarded DMA write (memvirt/dma),
 │                  live debugger — attach + breakpoints + registers (debugger),
 │                  in-memory injection scan — RWX / unbacked-exec / private-PE (injection),
-│                  optional YARA scanning of process memory + files (yarascan)
+│                  optional YARA scanning of process memory + files (yarascan),
+│                  in-process API monitor — host side of the injected agent (apimonitor)
 ├── analysis/      threat-hunt findings engine — correlate every module into ranked,
 │                  ATT&CK-tagged findings (findings)
 ├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator, handle strip
@@ -66,11 +69,12 @@ aetheris/
 ├── automation/    natural-language → reviewed PowerShell compiler
 ├── plugins/       built-in extension tools (top-memory, public-connections, …) + permissions
 ├── cli.py         headless forensic capture (`aetheris-cli`, also `<exe> cli …`)
-└── ui/            PyQt6 window, theme, log drawer, telemetry charts, module tabs
+└── ui/            PyQt6 window, theme, dropdown module navigator (tabdeck), log drawer, module tabs
+agent/             native C++ API-monitor agent DLL (injected) + its build script
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (227 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (233 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ## Install & run
@@ -111,7 +115,7 @@ additional features and degrade gracefully when absent (the UI tells you what's 
 
 ```powershell
 pip install .[test]
-pytest                                 # 227 tests over the cores
+pytest                                 # 233 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell

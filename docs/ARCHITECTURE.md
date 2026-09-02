@@ -103,12 +103,12 @@ sequenceDiagram
 | core | `settings` / `report` / `plugins` / `scheduler` | persisted prefs; CSV/JSON/HTML/MD serializers; text+widget plugin discovery (+ permissions/trust); Task Scheduler integration |
 | core | `autoruns` / `updater` | logon/boot autostart enum + reversible disable; self-update (manifest check → stage → apply-on-next-launch) — the frozen exe swaps its own file, a source/venv install mirrors freshly-downloaded source over itself and pip-refreshes its `.venv` when requirements change (a git checkout is left to git) |
 | — | `cli` / `plugins/*` | headless `aetheris-cli` capture; built-in extension tools (incl. a GUI widget plugin) |
-| forensics | `processes` / `memory` / `disasm` / `memvirt` / `dma` / `debugger` / `injection` / `yarascan` | autopsy, RAM matrix, Capstone/Keystone, VM scanner backends, PCILeech-FPGA physical read + guarded DMA write, live debugger (attach + breakpoints + regs), in-memory injection scan (RWX / unbacked-exec / private-PE), optional YARA scanning of process memory + files |
+| forensics | `processes` / `memory` / `disasm` / `memvirt` / `dma` / `debugger` / `injection` / `yarascan` / `apimonitor` | autopsy, RAM matrix, Capstone/Keystone, VM scanner backends, PCILeech-FPGA physical read + guarded DMA write, live debugger (attach + breakpoints + regs), in-memory injection scan (RWX / unbacked-exec / private-PE), optional YARA scanning, in-process API monitor (host side of the injected native agent in `agent/` — IAT-hooks a target's Win32 calls over a pipe) |
 | analysis | `findings` | threat-hunt correlation engine — merges signals from every layer into ranked, MITRE ATT&CK-tagged findings (sits above the feature layers, like the UI) |
 | storage | `mft` / `dedupe` / `unlock` / `handles` | MFT parse + tree-map, dedupe/ghosts, Restart-Manager lockers, handle stripping |
 | network | `connections` / `firewall` / `etwbw` / `procbw` / `geoip` | socket→PID, INetFwPolicy2 isolation, ETW per-proc B/s (EStats fallback), offline GeoIP |
 | automation | `nlshell` | deterministic NL → reviewed PowerShell |
-| ui | `mainwindow` / `tabs/*` / `telemetry` / `treemap` / `logdrawer` / `workers` | window shell, module tabs, charts, canvas, drawer, threading |
+| ui | `mainwindow` / `tabdeck` / `tabs/*` / `telemetry` / `treemap` / `logdrawer` / `workers` | window shell, dropdown module navigator, module pages, charts, canvas, drawer, threading |
 
 See [`../README.md`](../README.md) for the feature status table and the trust /
 safety model.
