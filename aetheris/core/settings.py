@@ -38,6 +38,7 @@ DEFAULTS: dict[str, Any] = {
     "update_url": "github:Dray973/Aetheris",
     "update_auto_check": True,
     "pending_update_version": "",
+    "pending_source_version": "",
 }
 
 

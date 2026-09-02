@@ -179,9 +179,9 @@ class MainWindow(QMainWindow):
         """Background check on startup; stages a newer version if configured."""
         from ..core import updater
         from .workers import Worker
-        if updater.has_pending():
+        if updater.any_pending():
             logbus.log("ui.main",
-                       f"update {updater.pending_version()} staged — applies on "
+                       f"update {updater.pending_label()} staged — applies on "
                        "next launch", logbus.Level.SUCCESS)
             return
         if not (settings().get("update_auto_check", True)
@@ -205,10 +205,10 @@ class MainWindow(QMainWindow):
             settings().set("update_url", url.strip())
             settings().save()
             url = url.strip()
-        if updater.has_pending():
+        if updater.any_pending():
             QMessageBox.information(
                 self, "Updates",
-                f"Update {updater.pending_version()} is staged and will be "
+                f"Update {updater.pending_label()} is staged and will be "
                 "applied the next time you launch Aetheris.")
             return
         info = updater.check(url)
@@ -217,19 +217,30 @@ class MainWindow(QMainWindow):
                                     f"You're up to date (v{__version__}).")
             return
         detail = f"\n\n{info.notes}" if info.notes else ""
+        question = (f"Version {info.version} is available (you have {__version__})."
+                    f"{detail}\n\nDownload it now? It will be applied on next launch.")
         if not updater.is_frozen():
-            QMessageBox.information(
-                self, "Update available",
-                f"Version {info.version} is available (you have {__version__})."
-                f"{detail}\n\nThis is a source install, so it updates by "
-                "re-running the installer (or `git pull` for a dev checkout) — "
-                "the built-in self-updater only applies to the standalone .exe.")
+            if updater.install_root() is None:
+                QMessageBox.information(
+                    self, "Update available",
+                    f"Version {info.version} is available (you have {__version__})."
+                    f"{detail}\n\nThis looks like a pip or git checkout — update it "
+                    "via `git pull` / pip, or re-run the installer.")
+                return
+            if QMessageBox.question(self, "Update available", question) \
+                    != QMessageBox.StandardButton.Yes:
+                return
+            ok, msg = updater.stage_source(info)
+            (QMessageBox.information if ok else QMessageBox.warning)(self, "Updates", msg)
             return
-        if QMessageBox.question(
-            self, "Update available",
-            f"Version {info.version} is available (you have {__version__})."
-            f"{detail}\n\nDownload it now? It will be applied on next launch.",
-        ) != QMessageBox.StandardButton.Yes:
+        if not info.url:
+            QMessageBox.warning(
+                self, "Updates",
+                f"Version {info.version} is available but the release has no "
+                "downloadable .exe yet.")
+            return
+        if QMessageBox.question(self, "Update available", question) \
+                != QMessageBox.StandardButton.Yes:
             return
         ok, msg = updater.stage(info)
         (QMessageBox.information if ok else QMessageBox.warning)(self, "Updates", msg)
