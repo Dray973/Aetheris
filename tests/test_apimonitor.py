@@ -1,4 +1,7 @@
 """In-process API monitor: event parsing/display, refusal guard, DLL discovery."""
+import hashlib
+
+from aetheris.core import updater
 from aetheris.forensics import apimonitor as am
 
 
@@ -51,3 +54,71 @@ def test_agent_dll_path_env_override(tmp_path, monkeypatch):
     monkeypatch.setenv("AETHERIS_AGENT_DLL", str(tmp_path / "missing.dll"))
     # falls through to repo/dist discovery (may or may not exist) — just must not raise
     am.agent_dll_path()
+
+
+def test_manifest_url_from_github_and_http(monkeypatch):
+    monkeypatch.setattr(updater, "effective_update_url", lambda: "github:owner/repo")
+    assert am._manifest_url() == \
+        "https://github.com/owner/repo/releases/latest/download/version.json"
+    monkeypatch.setattr(updater, "effective_update_url", lambda: "https://x/version.json")
+    assert am._manifest_url() == "https://x/version.json"
+
+
+def test_ensure_agent_dll_uses_local(monkeypatch, tmp_path):
+    local = tmp_path / "aetheris_agent.dll"
+    local.write_bytes(b"MZ")
+    monkeypatch.setattr(am, "agent_dll_path", lambda: local)
+    path, how = am.ensure_agent_dll()
+    assert path == local and how == "local"
+
+
+def test_ensure_agent_dll_no_download_when_disallowed(monkeypatch):
+    monkeypatch.setattr(am, "agent_dll_path", lambda: None)
+    path, how = am.ensure_agent_dll(allow_download=False)
+    assert path is None and "build it" in how
+
+
+def test_ensure_agent_dll_downloads_and_verifies(monkeypatch, tmp_path):
+    payload = b"AGENT-DLL-BYTES"
+    sha = hashlib.sha256(payload).hexdigest()
+    dest = tmp_path / "agent" / "aetheris_agent.dll"
+    monkeypatch.setattr(am, "agent_dll_path", lambda: None)
+    monkeypatch.setattr(am, "_cached_dll", lambda: dest)
+    monkeypatch.setattr(am, "_manifest_url", lambda: "http://x/version.json")
+    monkeypatch.setattr(updater, "_fetch_json",
+                        lambda url, headers=None: {"agent": {"url": "http://x/a.dll", "sha256": sha}})
+
+    def _dl(url, d):
+        d.parent.mkdir(parents=True, exist_ok=True)
+        d.write_bytes(payload)
+    monkeypatch.setattr(updater, "download", _dl)
+
+    path, how = am.ensure_agent_dll()
+    assert path == dest and how == "downloaded"
+    assert dest.read_bytes() == payload
+
+
+def test_ensure_agent_dll_rejects_checksum_mismatch(monkeypatch, tmp_path):
+    dest = tmp_path / "agent" / "aetheris_agent.dll"
+    monkeypatch.setattr(am, "agent_dll_path", lambda: None)
+    monkeypatch.setattr(am, "_cached_dll", lambda: dest)
+    monkeypatch.setattr(am, "_manifest_url", lambda: "http://x/version.json")
+    monkeypatch.setattr(updater, "_fetch_json",
+                        lambda url, headers=None: {"agent": {"url": "http://x/a.dll", "sha256": "dead"}})
+
+    def _dl(url, d):
+        d.parent.mkdir(parents=True, exist_ok=True)
+        d.write_bytes(b"whatever")
+    monkeypatch.setattr(updater, "download", _dl)
+
+    path, how = am.ensure_agent_dll()
+    assert path is None and "checksum" in how
+    assert not dest.exists()
+
+
+def test_ensure_agent_dll_no_agent_in_manifest(monkeypatch):
+    monkeypatch.setattr(am, "agent_dll_path", lambda: None)
+    monkeypatch.setattr(am, "_manifest_url", lambda: "http://x/version.json")
+    monkeypatch.setattr(updater, "_fetch_json", lambda url, headers=None: {"version": "9.9.9"})
+    path, how = am.ensure_agent_dll()
+    assert path is None and "no downloadable" in how

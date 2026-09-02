@@ -97,6 +97,7 @@ jobs:
           New-Item -ItemType Directory -Force artifacts | Out-Null
           Copy-Item dist\AetherisQuantumCore.exe artifacts\
           Copy-Item installer\Output\AetherisSetup.exe artifacts\
+          Copy-Item dist\aetheris_agent.dll artifacts\
 
       - name: Generate update manifest (version.json)
         run: |
@@ -109,7 +110,14 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($repo)) { $repo = "${{ github.repository }}" }
           $hash = (Get-FileHash artifacts\AetherisQuantumCore.exe -Algorithm SHA256).Hash.ToLower()
           $url = "https://github.com/$repo/releases/latest/download/AetherisQuantumCore.exe"
-          $m = [ordered]@{ version = $ver; url = $url; notes = "Aetheris $tag"; sha256 = $hash }
+          # Publish the injected agent DLL + its hash so a compiler-less source
+          # install can fetch a verified agent (see forensics/apimonitor.py).
+          $agentHash = (Get-FileHash artifacts\aetheris_agent.dll -Algorithm SHA256).Hash.ToLower()
+          $agentUrl = "https://github.com/$repo/releases/latest/download/aetheris_agent.dll"
+          $m = [ordered]@{
+            version = $ver; url = $url; notes = "Aetheris $tag"; sha256 = $hash
+            agent = [ordered]@{ url = $agentUrl; sha256 = $agentHash }
+          }
           $m | ConvertTo-Json | Set-Content artifacts\version.json -Encoding ascii
           Get-Content artifacts\version.json
 
@@ -132,6 +140,7 @@ jobs:
           gh release create ${{ github.ref_name }} `
             artifacts/AetherisQuantumCore.exe `
             artifacts/AetherisSetup.exe `
+            artifacts/aetheris_agent.dll `
             artifacts/version.json `
             --title "Aetheris Quantum Core ${{ github.ref_name }}" `
             --generate-notes @repoArg

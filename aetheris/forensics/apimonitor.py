@@ -23,9 +23,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..core import logbus
+from ..core.settings import config_dir
 from ..storage.unlock import CRITICAL_PROCESSES
 
 SRC = "forensics.apimonitor"
+AGENT_DLL = "aetheris_agent.dll"
 
 # Page-protection constants → readable names (for VirtualAlloc/-Protect events).
 _PROTECT = {
@@ -92,24 +94,76 @@ def can_monitor(name: str) -> tuple[bool, str]:
     return True, ""
 
 
+def _cached_dll() -> Path:
+    """Where a downloaded agent DLL is cached (for compiler-less installs)."""
+    return config_dir() / "agent" / AGENT_DLL
+
+
 def agent_dll_path() -> Path | None:
-    """Locate the built agent DLL. Search: env override, next to a frozen exe,
-    then the repo's dist/ (source runs)."""
+    """Locate a present agent DLL. Search: env override, next to / inside a
+    frozen exe (bundled), the repo's dist/ (local build), then the download
+    cache (fetched from the release)."""
     override = os.environ.get("AETHERIS_AGENT_DLL")
     if override and Path(override).is_file():
         return Path(override)
     candidates: list[Path] = []
     if getattr(sys, "frozen", False):
-        candidates.append(Path(sys.executable).with_name("aetheris_agent.dll"))
+        candidates.append(Path(sys.executable).with_name(AGENT_DLL))
         meipass = getattr(sys, "_MEIPASS", "")
         if meipass:
-            candidates.append(Path(meipass) / "aetheris_agent.dll")
+            candidates.append(Path(meipass) / AGENT_DLL)
     repo = Path(__file__).resolve().parents[2]
-    candidates.append(repo / "dist" / "aetheris_agent.dll")
+    candidates.append(repo / "dist" / AGENT_DLL)
+    candidates.append(_cached_dll())
     for c in candidates:
         if c.is_file():
             return c
     return None
+
+
+def _manifest_url() -> str:
+    """The version.json URL for the configured update source (so a source
+    install can fetch the agent DLL published with the release)."""
+    from ..core import updater
+    src = updater.effective_update_url()
+    if src.startswith("github:"):
+        repo = src[len("github:"):].strip()
+        return f"https://github.com/{repo}/releases/latest/download/version.json"
+    return src
+
+
+def ensure_agent_dll(allow_download: bool = True) -> tuple[Path | None, str]:
+    """Return a usable agent DLL, downloading it from the release (sha256-
+    verified) when it isn't present locally — so an install with no C++ compiler
+    still gets a working agent. Returns (path, how) or (None, reason)."""
+    local = agent_dll_path()
+    if local is not None:
+        return local, "local"
+    if not allow_download:
+        return None, "agent DLL not found — build it with agent/build.ps1"
+    from ..core import updater
+    url = _manifest_url()
+    if not url:
+        return None, "agent DLL not found and no update source is configured"
+    try:
+        data = updater._fetch_json(url, {"User-Agent": "Aetheris-Updater"})
+    except Exception as exc:  # noqa: BLE001
+        return None, f"agent DLL unavailable (manifest fetch failed: {exc})"
+    agent = data.get("agent") if isinstance(data, dict) else None
+    dll_url = str(agent.get("url", "")) if isinstance(agent, dict) else ""
+    sha = str(agent.get("sha256", "")) if isinstance(agent, dict) else ""
+    if not dll_url:
+        return None, "this release publishes no downloadable agent DLL"
+    dest = _cached_dll()
+    try:
+        updater.download(dll_url, dest)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"agent DLL download failed: {exc}"
+    if sha and updater._sha256(dest).lower() != sha.lower():
+        dest.unlink(missing_ok=True)
+        return None, "agent DLL checksum mismatch (discarded)"
+    logbus.success(SRC, f"fetched API-monitor agent → {dest}")
+    return dest, "downloaded"
 
 
 # --- native injection + pipe transport (Windows only) ----------------------
@@ -230,14 +284,16 @@ class AgentSession:
         if not ok:
             logbus.warn(SRC, msg)
             return False, msg
-        dll = agent_dll_path()
-        if dll is None:
-            return False, "agent DLL not found — build it with agent/build.ps1"
         if dry_run:
-            logbus.action(SRC, f"[dry-run] would inject {dll.name} into {self.name} (pid {self.pid})")
+            logbus.action(SRC, f"[dry-run] would inject the agent into {self.name} (pid {self.pid})")
             return True, "dry-run: agent not injected"
         if not IS_WINDOWS:
             return False, "API monitor is Windows-only"
+        dll, how = ensure_agent_dll()
+        if dll is None:
+            return False, how
+        if how == "downloaded":
+            logbus.action(SRC, "fetched the API-monitor agent from the release")
         self._on_event = on_event
         self._pipe = _k32.CreateNamedPipeW(self._pipe_name(), _PIPE_ACCESS_INBOUND,
                                            _PIPE_TYPE_BYTE, 1, 65536, 65536, 0, None)

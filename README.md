@@ -24,7 +24,7 @@ control.
 > no installer re-run required.
 > Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 233 tests. Optional native
+> pass `mypy --strict` + `ruff` and are covered by 239 tests. Optional native
 > engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
 > data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
 > status* below rather than pretending to be complete.
@@ -74,7 +74,7 @@ agent/             native C++ API-monitor agent DLL (injected) + its build scrip
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (233 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (239 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ## Install & run
@@ -115,7 +115,7 @@ additional features and degrade gracefully when absent (the UI tells you what's 
 
 ```powershell
 pip install .[test]
-pytest                                 # 233 tests over the cores
+pytest                                 # 239 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
