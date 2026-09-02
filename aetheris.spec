@@ -40,7 +40,15 @@ try:
 except Exception:
     pass
 
+import os
+
 datas = [("aetheris/ui/assets/aetheris.ico", "aetheris/ui/assets")]
+
+# Bundle the native API-monitor agent DLL at the exe root if it's been built
+# (agent/build.ps1 → dist/aetheris_agent.dll). apimonitor.agent_dll_path() looks
+# for it next to sys._MEIPASS. Absent → the API Monitor tab reports it's unbuilt.
+if os.path.exists("dist/aetheris_agent.dll"):
+    datas.append(("dist/aetheris_agent.dll", "."))
 
 a = Analysis(
     ["run.py"],

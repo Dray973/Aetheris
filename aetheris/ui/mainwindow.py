@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
-    QTabWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -30,6 +29,8 @@ from .. import __version__
 from ..core import audit, dryrun, logbus, privileges, report, safety
 from ..core.settings import settings
 from .logdrawer import LogDrawer
+from .tabdeck import TabDeck
+from .tabs.apimonitor_tab import ApiMonitorTab
 from .tabs.autoshell_tab import AutoShellTab
 from .tabs.debugger_tab import DebuggerTab
 from .tabs.dma_tab import DmaTab
@@ -267,10 +268,7 @@ class MainWindow(QMainWindow):
             logbus.error("ui.main", f"report export failed: {exc}")
 
     def _build_tabs(self) -> None:
-        self.tabs = QTabWidget()
-        self.tabs.setDocumentMode(True)
-        self.tabs.setUsesScrollButtons(True)
-        self.tabs.tabBar().setExpanding(False)
+        self.tabs = TabDeck()
         self.tabs.addTab(MemoryTab(), "①  Memory / Process Autopsy")
         self.tabs.addTab(StorageTab(), "②  Storage Surgery / MFT")
         self.tabs.addTab(NetworkTab(), "③  Network / Firewall")
@@ -279,6 +277,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(TimelineTab(), "⑥  Timeline")
         self.tabs.addTab(DmaTab(), "⑦  DMA / Physical")
         self.tabs.addTab(DebuggerTab(), "⑧  Debugger")
+        self.tabs.addTab(ApiMonitorTab(), "⑨  API Monitor")
         self.tabs.addTab(FindingsTab(), "🎯  Threat Hunt")
         self.tabs.addTab(PluginsTab(), "⚙  Plugins")
         self.setCentralWidget(self.tabs)

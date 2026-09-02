@@ -18,6 +18,19 @@ QTabBar::tab:hover:!selected { color: #b7c3e8; background: #0e1522; }
 QTabBar::tab:selected {
     color: #eaf0ff; background: #121a2b; border-top: 2px solid #7dd3fc;
 }
+QWidget#navbar { background: #090c12; border-bottom: 1px solid #223049; }
+QComboBox#nav {
+    background: #121a2b; color: #eaf0ff; border: 1px solid #2b3d5c;
+    border-radius: 5px; padding: 7px 14px; font-size: 13px; font-weight: 600;
+    min-width: 320px;
+}
+QComboBox#nav:hover { border-color: #3b6ea5; }
+QComboBox#nav::drop-down { border: none; width: 24px; }
+QComboBox QAbstractItemView {
+    background: #0d111a; color: #c8d3f5; border: 1px solid #274060;
+    selection-background-color: #274060; selection-color: #eaf0ff;
+    outline: none; padding: 2px;
+}
 QPushButton {
     background: #16203a; color: #c8d3f5; border: 1px solid #274060;
     padding: 6px 14px; border-radius: 4px;

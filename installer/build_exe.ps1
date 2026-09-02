@@ -71,6 +71,15 @@ Write-Step "Installing dependencies + PyInstaller"
 & $py -m pip install --upgrade pip --disable-pip-version-check | Out-Null
 & $py -m pip install ".[recommended,forensics]" pyinstaller
 
+# 1b. Build the native API-monitor agent DLL (best-effort; needs MSVC C++).
+#     Bundled by aetheris.spec if present; the app degrades gracefully without it.
+try {
+    Write-Step "Building API-monitor agent DLL"
+    & (Join-Path $repo 'agent\build.ps1')
+} catch {
+    Write-Host "  ! agent DLL build skipped ($($_.Exception.Message))" -ForegroundColor Yellow
+}
+
 # 2. Compile
 # Build intermediates go to TEMP (never inside a synced OneDrive folder, which
 # locks files and breaks PyInstaller's --clean). Only the final exe lands in dist\.
