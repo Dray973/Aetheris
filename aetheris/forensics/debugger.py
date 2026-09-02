@@ -441,6 +441,7 @@ class DebugSession:
             cont = self._dispatch(evt)
             W.kernel32.ContinueDebugEvent(evt.dwProcessId, evt.dwThreadId, cont)
         try:
+            self._bps.restore_all()
             W.kernel32.DebugActiveProcessStop(self.pid)
         except Exception:  # noqa: BLE001
             pass
@@ -495,6 +496,7 @@ class DebugSession:
             mode = "continue"
         self._stopped_tid = 0
         if self._stop.is_set():
+            self._bps.restore_all()
             return DBG_CONTINUE
         bp = self._bps.get(addr)
         if bp is not None and bp.original_byte is not None:
