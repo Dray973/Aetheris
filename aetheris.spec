@@ -17,7 +17,7 @@ from PyInstaller.utils.hooks import collect_submodules, collect_dynamic_libs
 # Optional modules to pull in fully when present in the build environment.
 _OPTIONAL = [
     "pyqtgraph", "OpenGL", "comtypes", "win32com", "win32api", "win32con",
-    "win32security", "win32file", "capstone", "keystone", "memprocfs",
+    "win32security", "win32file", "capstone", "keystone", "memprocfs", "yara",
 ]
 
 hiddenimports = ["aetheris.cli", "aetheris.ui.schedule_dialog",
