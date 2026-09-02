@@ -60,6 +60,15 @@ def test_correlation_merges_same_binary_into_critical():
     assert "T1036" in joined and "T1071" in joined and "T1547" in joined
 
 
+def test_yara_detector_maps_match_to_finding():
+    matches = [NS(rule="Susp_PS", pid=1234, name="evil.exe", address=0x1000,
+                  technique="T1059.001", description="encoded powershell")]
+    fs = F.detect_yara(matches, {1234: r"C:\x\evil.exe"})
+    assert len(fs) == 1
+    assert fs[0].category == "yara" and fs[0].technique == "T1059.001" and fs[0].score == 70
+    assert "Susp_PS" in fs[0].title
+
+
 def test_clean_system_yields_nothing():
     procs = [_p(512, "svchost.exe", r"C:\Windows\System32\svchost.exe", "signed")]
     assert F.analyze(processes=procs) == []

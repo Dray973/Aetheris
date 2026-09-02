@@ -206,6 +206,28 @@ def detect_injection(injections: Iterable[Any], pid_to_exe: dict[int, str] | Non
     return out
 
 
+def detect_yara(matches: Iterable[Any], pid_to_exe: dict[int, str] | None = None) -> list[Finding]:
+    pid_to_exe = pid_to_exe or {}
+    out: list[Finding] = []
+    for m in matches:
+        pid = getattr(m, "pid", 0)
+        desc = getattr(m, "description", "")
+        rule = getattr(m, "rule", "?")
+        evidence = [f"rule: {rule}"]
+        if pid:
+            evidence.append(f"region: 0x{getattr(m, 'address', 0):x}")
+        out.append(Finding(
+            key=_key(pid_to_exe.get(pid), getattr(m, "name", "")),
+            subject=f"{getattr(m, 'name', '?')}" + (f" (pid {pid})" if pid else ""),
+            title=f"YARA match: {rule}" + (f" — {desc}" if desc else ""),
+            score=70, category="yara",
+            technique=getattr(m, "technique", "") or "T1027",
+            technique_name="YARA rule match",
+            evidence=evidence,
+            actions=[f"kill pid {pid}"] if pid else []))
+    return out
+
+
 # --- correlation + entry points --------------------------------------------
 def correlate(findings: list[Finding]) -> list[Finding]:
     """Merge findings that share a key into one boosted finding; sort by score."""
@@ -242,6 +264,7 @@ def correlate(findings: list[Finding]) -> list[Finding]:
 def analyze(processes: Iterable[Any] = (), connections: Iterable[Any] = (),
             persistence: Iterable[Any] = (), tasks: Iterable[Any] = (),
             services: Iterable[Any] = (), injections: Iterable[Any] = (),
+            yara_matches: Iterable[Any] = (),
             pid_to_exe: dict[int, str] | None = None) -> list[Finding]:
     """Run every detector over the supplied data and return ranked, correlated
     findings. All inputs optional so each detector is testable in isolation."""
@@ -253,16 +276,19 @@ def analyze(processes: Iterable[Any] = (), connections: Iterable[Any] = (),
     signals += detect_tasks(tasks)
     signals += detect_services(services)
     signals += detect_injection(injections, pid_to_exe)
+    signals += detect_yara(yara_matches, pid_to_exe)
     return correlate(signals)
 
 
-def gather(scan_injection: bool = True, max_injection_scans: int = 40) -> list[Finding]:
+def gather(scan_injection: bool = True, scan_yara: bool = False,
+           max_scans: int = 40) -> list[Finding]:
     """Collect live data and analyze it (impure; run on a Worker)."""
     from ..core import logbus, taskaudit
     from ..core import persistence as persist_mod
     from ..core import services as services_mod
     from ..forensics import injection as inj_mod
     from ..forensics import processes as proc_mod
+    from ..forensics import yarascan
     from ..forensics.memvirt import get_backend
     from ..network import connections as conn_mod
 
@@ -282,19 +308,29 @@ def gather(scan_injection: bool = True, max_injection_scans: int = 40) -> list[F
         svcs = []
 
     pid_to_exe = {p.pid: p.exe for p in procs}
+    suspects = [p for p in procs if p.signature == "unsigned" or _in_suspicious_dir(p.exe)]
+    backend = get_backend() if (scan_injection or scan_yara) else None
+
     injections: list[Any] = []
-    if scan_injection:
-        backend = get_backend()
-        suspects = [p for p in procs if p.signature == "unsigned" or _in_suspicious_dir(p.exe)]
-        for p in suspects[:max_injection_scans]:
+    if scan_injection and backend is not None:
+        for p in suspects[:max_scans]:
             try:
                 injections += inj_mod.scan_process(backend, p.pid, p.name)
             except Exception:  # noqa: BLE001
                 continue
 
+    yara_matches: list[Any] = []
+    if scan_yara and backend is not None and yarascan.available():
+        rules = yarascan.load_rules()
+        for p in suspects[:max_scans]:
+            try:
+                yara_matches += yarascan.scan_process(rules, backend, p.pid, p.name)
+            except Exception:  # noqa: BLE001
+                continue
+
     findings = analyze(processes=procs, connections=conns, persistence=pmap,
                        tasks=tasks, services=svcs, injections=injections,
-                       pid_to_exe=pid_to_exe)
+                       yara_matches=yara_matches, pid_to_exe=pid_to_exe)
     logbus.trace(SRC, f"hunt: {len(findings)} finding(s) from "
                       f"{len(procs)} proc / {len(conns)} conn")
     return findings

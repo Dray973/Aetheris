@@ -55,6 +55,10 @@ class FindingsTab(QWidget):
         self.inj_cb = QCheckBox("Scan memory for injection (slower)")
         self.inj_cb.setChecked(True)
         bar.addWidget(self.inj_cb)
+        self.yara_cb = QCheckBox("Scan with YARA")
+        self.yara_cb.setToolTip("Match built-in + user rules against suspect process memory "
+                                "(needs yara-python)")
+        bar.addWidget(self.yara_cb)
         bar.addStretch(1)
         self.summary = QLabel("", objectName="subtle")
         bar.addWidget(self.summary)
@@ -82,7 +86,7 @@ class FindingsTab(QWidget):
             return
         self.run_btn.setEnabled(False)
         self.summary.setText("hunting…")
-        self._worker = Worker(F.gather, self.inj_cb.isChecked())
+        self._worker = Worker(F.gather, self.inj_cb.isChecked(), self.yara_cb.isChecked())
         self._worker.done.connect(self._populate)
         self._worker.failed.connect(self._on_failed)
         self._worker.start()

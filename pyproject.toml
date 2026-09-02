@@ -33,6 +33,7 @@ forensics = [
     "capstone>=5.0",
     "keystone-engine>=0.9",
     "memprocfs>=5.0; sys_platform == 'win32'",
+    "yara-python>=4.3",
 ]
 # Everything.
 full = [
@@ -118,7 +119,7 @@ module = ["aetheris.core.winapi", "aetheris.core.signing",
           "aetheris.network.procbw", "aetheris.network.etwbw",
           "aetheris.network.firewall", "aetheris.storage.handles",
           "aetheris.forensics.disasm", "aetheris.forensics.memvirt",
-          "aetheris.forensics.debugger"]
+          "aetheris.forensics.debugger", "aetheris.forensics.yarascan"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
