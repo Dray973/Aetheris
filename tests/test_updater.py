@@ -201,6 +201,54 @@ def test_source_swap_script_mirrors_dirs_and_copies_files(tmp_path):
     assert "copy /y" in script and "run.py" in script
     assert 'start "" "py.exe"' in script
     assert script.rstrip().endswith('del "%~f0"')
+    assert "-m pip install" not in script  # no dep refresh unless asked
+
+
+def test_requirements_changed(tmp_path):
+    root = tmp_path / "install"
+    staged = tmp_path / "staged"
+    root.mkdir()
+    staged.mkdir()
+    # staged has no requirements -> nothing to refresh
+    assert updater.requirements_changed(root, staged) is False
+    # install has none, staged adds one -> refresh
+    (staged / "requirements.txt").write_text("PyQt6\npsutil\n")
+    assert updater.requirements_changed(root, staged) is True
+    # identical (modulo comments/whitespace) -> no refresh
+    (root / "requirements.txt").write_text("# deps\nPyQt6\n  psutil  \n")
+    assert updater.requirements_changed(root, staged) is False
+    # a genuine change -> refresh
+    (staged / "requirements.txt").write_text("PyQt6\npsutil\nyara-python\n")
+    assert updater.requirements_changed(root, staged) is True
+
+
+def test_source_swap_script_refreshes_deps_when_requested(tmp_path):
+    root = tmp_path / "install"
+    staged = tmp_path / "staged-src"
+    (staged / "aetheris").mkdir(parents=True)
+    (staged / "run.py").write_text("x")
+    (staged / "requirements.txt").write_text("PyQt6\n")
+    log = tmp_path / "pip.log"
+    script = updater._source_swap_script(
+        str(tmp_path / "pythonw.exe"), root, staged,
+        refresh_deps=True, pip_python=str(tmp_path / "python.exe"), log=log)
+    assert "-m pip install -r" in script
+    assert "requirements.txt" in script
+    assert str(log) in script
+    # the pip line must run after the copy but before relaunch
+    assert script.index("-m pip install") < script.index('start ""')
+
+
+def test_console_python_prefers_python_exe(tmp_path):
+    (tmp_path / "python.exe").write_text("x")
+    pyw = tmp_path / "pythonw.exe"
+    pyw.write_text("x")
+    assert updater._console_python(str(pyw)) == str(tmp_path / "python.exe")
+    # no sibling python.exe -> unchanged
+    lone = tmp_path / "sub" / "pythonw.exe"
+    lone.parent.mkdir()
+    lone.write_text("x")
+    assert updater._console_python(str(lone)) == str(lone)
 
 
 def test_check_and_stage_source_stages_source(tmp_path, monkeypatch):

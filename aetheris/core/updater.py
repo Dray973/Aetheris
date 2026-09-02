@@ -332,11 +332,48 @@ def stage_source(info: UpdateInfo, root: Path | None = None,
     return True, f"source update {info.version} staged"
 
 
+def _console_python(python_exe: str) -> str:
+    """The console interpreter (python.exe) beside a windowed one (pythonw.exe),
+    so pip runs with a real stdio; falls back to what was given."""
+    p = Path(python_exe)
+    if p.name.lower() == "pythonw.exe":
+        cand = p.with_name("python.exe")
+        if cand.exists():
+            return str(cand)
+    return python_exe
+
+
+def _read_requirements(path: Path) -> list[str]:
+    try:
+        return [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
+                if ln.strip() and not ln.strip().startswith("#")]
+    except OSError:
+        return []
+
+
+def requirements_changed(root: Path, staged: Path) -> bool:
+    """True when the staged ``requirements.txt`` differs from the installed one
+    (or the install has none) — i.e. the ``.venv`` needs a ``pip`` refresh. New
+    deps are installed / upgraded on apply; removed ones are left in place
+    (harmless), never pruned."""
+    new = staged / "requirements.txt"
+    if not new.is_file():
+        return False
+    old = root / "requirements.txt"
+    if not old.is_file():
+        return True
+    return _read_requirements(new) != _read_requirements(old)
+
+
 def _source_swap_script(python_exe: str, root: Path, staged: Path,
-                        items: tuple[str, ...] = APP_ITEMS) -> str:
+                        items: tuple[str, ...] = APP_ITEMS, *,
+                        refresh_deps: bool = False, pip_python: str | None = None,
+                        log: Path | None = None) -> str:
     """Batch that mirrors the staged source over the install and relaunches.
     Directories are mirrored (robocopy /MIR — removes files deleted upstream);
-    top-level files are copied. The .venv and everything outside ``items`` are
+    top-level files are copied. When ``refresh_deps`` is set, the venv's pip
+    installs the (now-updated) requirements.txt before relaunch — a failed pip
+    never blocks the relaunch. The .venv and everything outside ``items`` are
     untouched."""
     lines = ["@echo off", "timeout /t 1 /nobreak >nul"]
     for item in items:
@@ -346,6 +383,11 @@ def _source_swap_script(python_exe: str, root: Path, staged: Path,
                 f'robocopy "{src}" "{dst}" /MIR /NFL /NDL /NJH /NJS /NC /NS /NP >nul')
         elif src.is_file():
             lines.append(f'copy /y "{src}" "{dst}" >nul')
+    if refresh_deps:
+        pip_py = pip_python or python_exe
+        redir = f'>> "{log}" 2>&1' if log is not None else ">nul 2>&1"
+        lines.append(f'"{pip_py}" -m pip install -r "{root / "requirements.txt"}" '
+                     f'--disable-pip-version-check {redir}')
     lines.append(f'start "" "{python_exe}" "{root / "run.py"}"')
     lines.append(f'rmdir /s /q "{staged}" >nul 2>&1')
     lines.append('del "%~f0"')
@@ -366,12 +408,18 @@ def apply_pending_source() -> bool:
     try:
         helper = config_dir() / "update" / "apply-src.cmd"
         helper.parent.mkdir(parents=True, exist_ok=True)
-        helper.write_text(_source_swap_script(sys.executable, root, staged),
-                          encoding="ascii")
+        refresh = requirements_changed(root, staged)
+        script = _source_swap_script(
+            sys.executable, root, staged, refresh_deps=refresh,
+            pip_python=_console_python(sys.executable),
+            log=(helper.parent / "pip-refresh.log") if refresh else None)
+        helper.write_text(script, encoding="ascii")
         settings().update(pending_source_version="")
         settings().save()
         subprocess.Popen(["cmd", "/c", str(helper)],
                          creationflags=DETACHED_PROCESS, close_fds=True)
+        if refresh:
+            logbus.action(SRC, "source update: dependencies changed, refreshing .venv")
         logbus.action(SRC, "applying staged source update; relaunching")
         return True
     except Exception as exc:  # noqa: BLE001
