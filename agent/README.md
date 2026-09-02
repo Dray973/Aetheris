@@ -8,15 +8,18 @@ in [`aetheris/forensics/apimonitor.py`](../aetheris/forensics/apimonitor.py).
 ## What it does
 - On load, connects to a host-owned named pipe (`\\.\pipe\aetheris_agent_<pid>`).
 - Installs **IAT hooks by resolved address** (robust against API-set forwarders)
-  on: `CreateFileW`, `LoadLibraryW`, `VirtualAlloc`, `WriteProcessMemory`.
-- Streams each observed call as one line of NDJSON back to the host.
-- Un-hooks cleanly when the host signals stop (a named event).
+  on: `CreateFileW`, `LoadLibraryW`, `VirtualAlloc`, `WriteProcessMemory`,
+  `CreateProcessW` (spawns) and `connect` (outbound network).
+- Streams each observed call as one line of NDJSON back to the host, each tagged
+  with the **immediate caller** (`module+0xoffset`, via `_ReturnAddress`).
+- Un-hooks cleanly when the host signals stop. The DLL stays resident and loops
+  one session per attach, so **re-attaching to the same process works**.
 
 It **only observes** — every hook forwards to the real function and returns its
 result unchanged. A per-thread reentrancy guard prevents recursive logging, and
 the agent's own module is never patched.
 
-**Scope (v1):** catches statically-imported calls (the common case). Calls made
+**Scope:** catches statically-imported calls (the common case). Calls made
 through a hand-resolved `GetProcAddress` pointer are not covered — that needs
 inline hooking (a later iteration).
 
