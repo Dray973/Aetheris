@@ -117,7 +117,8 @@ ignore_errors = true
 module = ["aetheris.core.winapi", "aetheris.core.signing",
           "aetheris.network.procbw", "aetheris.network.etwbw",
           "aetheris.network.firewall", "aetheris.storage.handles",
-          "aetheris.forensics.disasm", "aetheris.forensics.memvirt"]
+          "aetheris.forensics.disasm", "aetheris.forensics.memvirt",
+          "aetheris.forensics.debugger"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
