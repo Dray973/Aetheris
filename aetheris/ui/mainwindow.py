@@ -33,6 +33,7 @@ from .logdrawer import LogDrawer
 from .tabs.autoshell_tab import AutoShellTab
 from .tabs.debugger_tab import DebuggerTab
 from .tabs.dma_tab import DmaTab
+from .tabs.findings_tab import FindingsTab
 from .tabs.memory_tab import MemoryTab
 from .tabs.network_tab import NetworkTab
 from .tabs.plugins_tab import PluginsTab
@@ -264,6 +265,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(TimelineTab(), "⑥  Timeline")
         self.tabs.addTab(DmaTab(), "⑦  DMA / Physical")
         self.tabs.addTab(DebuggerTab(), "⑧  Debugger")
+        self.tabs.addTab(FindingsTab(), "🎯  Threat Hunt")
         self.tabs.addTab(PluginsTab(), "⚙  Plugins")
         self.setCentralWidget(self.tabs)
 
