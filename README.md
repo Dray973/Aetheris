@@ -24,7 +24,13 @@ control.
 > no installer re-run required.
 > Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 245 tests. Optional native
+> pass `mypy --strict` + `ruff` and are covered by 370 tests. The hot paths run
+> in two in-tree native engines — **Rust** (`aetheris_core`: entropy, byte
+> search, PE parse/carve, NTFS MFT) and **C++** (`aetheris_win`: processes,
+> memory, the system-wide handle table, Authenticode, services/drivers, socket
+> tables) — each with a pure-Python fallback that is tested for parity, and a
+> versioned ABI so a stale library degrades instead of misreading structs.
+> Optional third-party native
 > engines (MemProcFS, capstone, keystone) degrade gracefully; the one optional
 > data drop-in (a GeoLite2 DB for city-level GeoIP) is labelled in *Feature
 > status* below rather than pretending to be complete.
@@ -68,16 +74,58 @@ aetheris/
 ├── storage/       raw MFT parser, SHA-256 dedupe / ghost scan, guarded obliterator, handle strip
 ├── network/       socket→process interceptor, per-process B/s (ETW), GeoIP, firewall isolation
 ├── automation/    natural-language → reviewed PowerShell compiler
+├── native/        ctypes bindings to the two native engines (loader, core, win) —
+│                  every call falls back to pure Python when a DLL is absent
 ├── plugins/       built-in extension tools (top-memory, public-connections, …) + permissions
 ├── cli.py         headless forensic capture (`aetheris-cli`, also `<exe> cli …`)
 └── ui/            PyQt6 window, theme, dropdown module navigator (tabdeck), log drawer, module tabs
 agent/             native C++ API-monitor agent DLL (injected) + its build script
-native/            native Rust scan lib (entropy + memmem, cdylib) + its build script
+native/            the two native engines + one build script for both:
+                     aetheris_core/  Rust — entropy, byte search, PE parse/carve,
+                                     region classification, NTFS MFT records
+                     aetheris_win/   C++  — processes, memory maps/reads, the
+                                     system-wide handle table, Authenticode,
+                                     services/drivers, socket tables, privileges,
+                                     registry subtree snapshot
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (245 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (370 tests) for the cores + pytest-qt UI-thread tests
 ```
+
+### Native engines
+
+Two optional libraries carry the hot paths. Build both with
+`powershell -ExecutionPolicy Bypass -File native\build.ps1` (Rust toolchain for
+one, MSVC C++ Build Tools for the other; a missing toolchain is reported and
+skipped, never fatal). They land in `dist/` and are bundled into the frozen exe.
+
+**Neither is required.** `aetheris/native/loader.py` finds a library, checks the
+ABI version it reports, and hands back `None` on any mismatch — so a stale or
+absent DLL silently degrades to the pure-Python implementation rather than
+misreading structs. `tests/test_native_core.py` runs the whole Rust surface both
+ways and asserts the two agree.
+
+One capability has no Python equivalent: enumerating the **system-wide** handle
+table. `NtQueryObject` can block forever on some handles and Python cannot
+abandon a blocked call, so the Python path must be given a PID set. The C++
+engine runs every query on a worker it can walk away from, which is what makes a
+whole-machine sweep safe.
+
+**What is deliberately *not* native**, and why — each of these was measured or
+assessed and left in Python on purpose:
+
+| Module | Reason |
+| --- | --- |
+| `storage/dedupe` | `hashlib` reaches 3.2 GB/s via OpenSSL's SHA-NI instructions; a portable Rust SHA-256 measured 277 MB/s, ~11x slower |
+| `core/audit` | The tamper-evident chain hashes a byte-exact `json.dumps`; reimplementing that encoding elsewhere would create a security-critical compatibility surface for a rarely-run verify |
+| `analysis/findings` | Duck-typed correlation over a few hundred objects — marshaling them across the boundary would cost more than the work |
+| `core/timeline` | Set arithmetic, already at C speed in CPython |
+| `core/plugins` | Loads user Python plugins; cannot be native by definition |
+| `core/updater`, `crashreport`, `report` | HTTP, file staging and serialization — Python is the right tool |
+| `forensics/disasm`, `yarascan` | Thin wrappers over capstone / libyara, already native |
+| `forensics/apimonitor` | Host-side pipe reader for the C++ agent in `agent/` |
+| `forensics/debugger` | Already correct and verified live. Its one real ctypes hazard — `CONTEXT` needs 16-byte alignment for the XMM save area, which `_pack_` does not guarantee — was measured at 20,000/20,000 aligned, and `WaitForDebugEvent`'s thread affinity is already handled by a dedicated loop thread. Porting would risk a working component that writes registers in another process, for no measurable gain |
 
 ## Install & run
 
@@ -117,7 +165,7 @@ additional features and degrade gracefully when absent (the UI tells you what's 
 
 ```powershell
 pip install .[test]
-pytest                                 # 245 tests over the cores
+pytest                                 # 370 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
