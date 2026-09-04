@@ -82,10 +82,40 @@ Order matters, and the first step is the slow one:
 > silently unsigned binaries, which is the worst of both outcomes — check the
 > `Sign the app exe` step's status in the release run rather than assuming.
 
-**Releases through v0.3.0 are unsigned**, because these secrets are not set on
-the repository. Windows SmartScreen will warn on first run. For a security tool
-that is a poor default: users learn to click through exactly the warning that
-protects them.
+**Releases are currently unsigned** — these secrets are not set, so the signing
+steps skip and the workflow publishes working unsigned binaries. Windows
+SmartScreen warns on first run. For a security tool that is a poor default:
+users learn to click through exactly the warning that protects them. Until it
+is fixed, the README points users at the SHA-256 in `version.json` instead.
+
+## Why it is not set up yet
+
+Artifact Signing is not a drop-in for a solo project, and the blockers are
+worth recording so this is not re-attempted from scratch:
+
+- **Organisation validation** needs a **D-U-N-S number** and a registered legal
+  entity with verifiable trading history. Without a company there is nothing
+  truthful to enter, and the certificate subject would otherwise default to the
+  Entra tenant domain (`<something>.onmicrosoft.com`), which is worse than
+  unsigned — it reads as a throwaway publisher.
+- **Individual validation** avoids all that, but puts your **legal name** in the
+  certificate subject of every published binary, visible to anyone who inspects
+  the signature. There is no way to sign as a project name without an entity.
+- It is a **paid** service and is available in a limited set of
+  countries/regions — check the supported list before investing time.
+
+The workflow and this page are ready; only the six secrets are missing. If the
+situation changes — a registered entity, or a decision that publishing a legal
+name is acceptable — setup is the steps above and nothing in the repo needs to
+change.
+
+### The alternative, if signing stays off
+
+A traditional OV certificate from a CA runs a few hundred a year and has the
+same identity requirements. EV clears SmartScreen immediately but usually ships
+on a hardware token that CI cannot use. Neither is obviously better here, which
+is why the honest position is: stay unsigned, say so plainly, and publish a
+hash users can verify.
 
 ## Verify a signature
 
