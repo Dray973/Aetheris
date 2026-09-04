@@ -191,10 +191,11 @@ pub fn parse_record(record: &[u8], index: u64) -> Option<MftRecord> {
 /// UTF-16LE with replacement for unpaired surrogates, matching Python's
 /// `decode("utf-16-le", errors="replace")`.
 fn decode_utf16le(bytes: &[u8]) -> String {
-    let units: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
-        .collect();
+    // as_chunks gives [u8; 2] arrays, so from_le_bytes applies directly and a
+    // trailing odd byte lands in the discarded remainder rather than needing a
+    // length check. This runs once per MFT record name.
+    let (pairs, _odd) = bytes.as_chunks::<2>();
+    let units: Vec<u16> = pairs.iter().copied().map(u16::from_le_bytes).collect();
     char::decode_utf16(units)
         .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
         .collect()

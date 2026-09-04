@@ -44,8 +44,11 @@ impl Sha256 {
     fn compress(&mut self) {
         let mut w = [0u32; 64];
         // The 64-byte block is exactly the first 16 schedule words, big-endian.
-        for (word, b) in w.iter_mut().zip(self.block.chunks_exact(4)) {
-            *word = u32::from_be_bytes([b[0], b[1], b[2], b[3]]);
+        // as_chunks yields [u8; 4] arrays rather than slices, so from_be_bytes
+        // takes them directly and the loop carries no bounds checks.
+        let (words, _rest) = self.block.as_chunks::<4>();
+        for (word, b) in w.iter_mut().zip(words) {
+            *word = u32::from_be_bytes(*b);
         }
         for i in 16..64 {
             let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
