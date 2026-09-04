@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..core import logbus
+from ..native import core as nativecore
 
 SRC = "storage.mft"
 
@@ -196,7 +197,9 @@ def _mft_extents(fh: Any, boot: BootInfo) -> list[tuple[int, int]]:
             break
         if attr_type == ATTR_DATA and buf[off + 8] == 1:
             run_off = struct.unpack_from("<H", buf, off + 0x20)[0]
-            extents = _parse_run_list(buf, off + run_off, boot.cluster_size)
+            native = nativecore.mft_run_list(bytes(buf), off + run_off, boot.cluster_size)
+            extents = native if native is not None else _parse_run_list(
+                buf, off + run_off, boot.cluster_size)
             if extents:
                 total = sum(l for _o, l in extents)
                 logbus.trace(SRC, f"$MFT $DATA: {len(extents)} extent(s), "
@@ -238,21 +241,37 @@ def parse_volume(volume: str = r"\\.\C:", max_records: int = 20000) -> Iterator[
                 data = fh.read(to_read)
                 if len(data) < rec_size:
                     break
-                for r in range(0, len(data) - rec_size + 1, rec_size):
-                    idx = slot
-                    slot += 1
-                    chunk = data[r:r + rec_size]
-                    if chunk[0:4] != FILE_SIGNATURE:
-                        continue
-                    rbuf = bytearray(chunk)
-                    if not _apply_fixups(rbuf, boot.bytes_per_sector):
-                        continue
-                    rec = _parse_record(bytes(rbuf), idx)
-                    if rec and rec.name:
+
+                # The native core fixes up and decodes the whole block in one
+                # call. The Python loop below runs a dozen struct.unpack_from
+                # calls per record over tens of thousands of records, which is
+                # what this port is for; it stays as the fallback.
+                block = nativecore.mft_parse_block(
+                    data, rec_size, boot.bytes_per_sector, slot)
+                if block is not None:
+                    slot += len(data) // rec_size
+                    for nrec in block:
                         yielded += 1
-                        yield rec
+                        yield MftRecord(nrec.index, nrec.in_use, nrec.is_directory,
+                                        nrec.name, nrec.size, nrec.parent_index)
                         if yielded >= max_records:
                             break
+                else:
+                    for r in range(0, len(data) - rec_size + 1, rec_size):
+                        idx = slot
+                        slot += 1
+                        chunk = data[r:r + rec_size]
+                        if chunk[0:4] != FILE_SIGNATURE:
+                            continue
+                        rbuf = bytearray(chunk)
+                        if not _apply_fixups(rbuf, boot.bytes_per_sector):
+                            continue
+                        rec = _parse_record(bytes(rbuf), idx)
+                        if rec and rec.name:
+                            yielded += 1
+                            yield rec
+                            if yielded >= max_records:
+                                break
                 pos += len(data)
                 remaining -= len(data)
             if yielded >= max_records:

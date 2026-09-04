@@ -25,6 +25,8 @@ from typing import Any
 
 import psutil
 
+from ..native import win as nativewin
+
 SRC = "network.connections"
 
 
@@ -63,12 +65,51 @@ def _classify(ip: str) -> str:
 def snapshot(resolve_dns: bool = False, resolve_geo: bool = True) -> list[Connection]:
     """Return current sockets mapped to their owning processes."""
     conns: list[Connection] = []
-    name_cache: dict[int, str] = {}
     geo = None
     if resolve_geo:
         from .geoip import get_resolver
         r = get_resolver()
         geo = r if r.available else None
+
+    def _enrich(conn: Connection) -> Connection:
+        if conn.raddr and conn.remote_class == "public":
+            if resolve_dns:
+                try:
+                    conn.rdns = socket.gethostbyaddr(conn.raddr)[0]
+                except Exception:
+                    conn.rdns = ""
+            if geo is not None:
+                conn.geo = geo.lookup_str(conn.raddr)
+        return conn
+
+    # The native engine pulls all four IP-Helper tables (TCP/UDP × IPv4/IPv6)
+    # in one call. Process names come from the same engine's snapshot rather
+    # than a psutil.Process() per pid.
+    native = nativewin.enum_connections()
+    if native is not None:
+        # Resolve names only for pids that actually own a socket. Taking a full
+        # process snapshot instead costs an OpenProcess + image-path query for
+        # every process on the box, which measured 10x slower than psutil for
+        # the same result.
+        names: dict[int, str] = {}
+        for c in native:
+            if c.pid and c.pid not in names:
+                try:
+                    names[c.pid] = psutil.Process(c.pid).name()
+                except Exception:
+                    names[c.pid] = "?"
+        for c in native:
+            conns.append(_enrich(Connection(
+                pid=c.pid or None, proc_name=names.get(c.pid, "?"),
+                laddr=c.laddr, lport=c.lport, raddr=c.raddr, rport=c.rport,
+                status=nativewin.tcp_state_label(c.state) if c.proto == "TCP" else "NONE",
+                family="IPv6" if c.family == 6 else "IPv4",
+                kind=c.proto,
+                remote_class=_classify(c.raddr),
+            )))
+        return conns
+
+    name_cache: dict[int, str] = {}
     for c in psutil.net_connections(kind="inet"):
         pid = c.pid
         name = "?"
@@ -83,23 +124,14 @@ def snapshot(resolve_dns: bool = False, resolve_geo: bool = True) -> list[Connec
         lport = c.laddr.port if c.laddr else 0
         raddr = c.raddr.ip if c.raddr else ""
         rport = c.raddr.port if c.raddr else 0
-        conn = Connection(
+        conns.append(_enrich(Connection(
             pid=pid, proc_name=name,
             laddr=laddr, lport=lport, raddr=raddr, rport=rport,
             status=c.status,
             family="IPv6" if c.family == socket.AF_INET6 else "IPv4",
             kind="TCP" if c.type == socket.SOCK_STREAM else "UDP",
             remote_class=_classify(raddr),
-        )
-        if raddr and conn.remote_class == "public":
-            if resolve_dns:
-                try:
-                    conn.rdns = socket.gethostbyaddr(raddr)[0]
-                except Exception:
-                    conn.rdns = ""
-            if geo is not None:
-                conn.geo = geo.lookup_str(raddr)
-        conns.append(conn)
+        )))
     return conns
 
 

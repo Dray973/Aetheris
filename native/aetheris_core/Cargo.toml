@@ -1,0 +1,19 @@
+[package]
+name = "aetheris_core"
+version = "0.1.0"
+edition = "2021"
+description = "Aetheris native analysis core — entropy, search, PE parsing/carving, region classification, hashing (C ABI)"
+# slice::as_chunks. Declared so an older toolchain fails with a clear cargo
+# message rather than a confusing compile error — this engine is optional and
+# gets built locally by users on whatever Rust they happen to have.
+rust-version = "1.88"
+
+[lib]
+name = "aetheris_core"
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "unwind"
