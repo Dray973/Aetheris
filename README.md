@@ -268,8 +268,16 @@ The suite does **not** include a credential-extraction path against
   `%APPDATA%\AetherisQuantumCore\settings.json` (atomic writes, defaults on any
   corrupt/missing file).
 - **Code signing** — the exe/installer are Authenticode-signable; the build
-  script and release workflow sign when a certificate is configured and produce
-  working unsigned binaries otherwise. See [`docs/SIGNING.md`](docs/SIGNING.md).
+  script and release workflow sign via Azure Trusted Signing when the secrets
+  are configured, and produce working unsigned binaries otherwise. See
+  [`docs/SIGNING.md`](docs/SIGNING.md).
+
+  > **Published releases are currently unsigned.** The Trusted Signing secrets
+  > are not set on this repository, so SmartScreen shows "Windows protected
+  > your PC" on first run of a downloaded exe. Verify what you downloaded
+  > against the `sha256` in the release's `version.json` before running it —
+  > and be aware that training users to click past that warning is exactly the
+  > habit a tool like this should not encourage.
 
 ## Plugins & headless CLI
 
