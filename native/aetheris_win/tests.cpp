@@ -160,22 +160,66 @@ void test_stream_primitives() {
     CHECK(b.size() == 6);
 }
 
-// Walk a key that exists on every Windows install and verify the stream
-// parses by the same offsets aetheris/native/win.py decodes with.
+// Walk a subtree this test creates, so the expected contents are exact.
+//
+// An earlier version walked HKCU\...\CurrentVersion\Run on the assumption that
+// it exists everywhere. It does not: a fresh CI profile has no such key, the
+// walk returned nothing, and the test failed for lack of data rather than for
+// a defect. Building the fixture removes the machine dependence entirely and
+// lets the stream be checked against known values instead of just parsed.
+const wchar_t* TEST_KEY = L"Software\\AetherisSelfTest";
+
+bool make_fixture() {
+    HKEY root = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, TEST_KEY, 0, nullptr, 0,
+                        KEY_WRITE, nullptr, &root, nullptr) != ERROR_SUCCESS) {
+        return false;
+    }
+    const wchar_t* sz = L"hello";
+    RegSetValueExW(root, L"AString", 0, REG_SZ, (const BYTE*)sz,
+                   (DWORD)((wcslen(sz) + 1) * sizeof(wchar_t)));
+    DWORD dw = 1234;
+    RegSetValueExW(root, L"ANumber", 0, REG_DWORD, (const BYTE*)&dw, sizeof(dw));
+    const BYTE bin[3] = {1, 2, 3};
+    RegSetValueExW(root, L"ABlob", 0, REG_BINARY, bin, sizeof(bin));
+
+    HKEY child = nullptr;
+    if (RegCreateKeyExW(root, L"Child", 0, nullptr, 0, KEY_WRITE,
+                        nullptr, &child, nullptr) == ERROR_SUCCESS) {
+        DWORD one = 1;
+        RegSetValueExW(child, L"Nested", 0, REG_DWORD, (const BYTE*)&one, sizeof(one));
+        RegCloseKey(child);
+    }
+    RegCloseKey(root);
+    return true;
+}
+
+void drop_fixture() {
+    RegDeleteTreeW(HKEY_CURRENT_USER, TEST_KEY);
+}
+
 void test_reg_walk_stream() {
+    if (!make_fixture()) {
+        printf("  SKIP: could not create the fixture key\n");
+        return;
+    }
+
     std::vector<uint8_t> buf;
-    reg_walk(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-             0, 1, buf);
+    reg_walk(HKEY_CURRENT_USER, TEST_KEY, 0, 1, buf);
     CHECK(!buf.empty());
 
+    // Decode by the same offsets aetheris/native/win.py uses.
     size_t pos = 0, keys = 0, values = 0;
-    bool ok = true;
+    bool ok = true, saw_string = false, saw_dword = false, saw_binary = false;
+    bool saw_child = false;
     while (pos + 8 <= buf.size()) {
         uint32_t key_bytes, count;
         memcpy(&key_bytes, buf.data() + pos, 4);
         memcpy(&count, buf.data() + pos + 4, 4);
         pos += 8;
         if (pos + key_bytes > buf.size()) { ok = false; break; }
+        std::wstring key((const wchar_t*)(buf.data() + pos), key_bytes / sizeof(wchar_t));
+        if (key.find(L"Child") != std::wstring::npos) saw_child = true;
         pos += key_bytes;
         for (uint32_t i = 0; i < count; ++i) {
             if (pos + 12 > buf.size()) { ok = false; break; }
@@ -185,16 +229,35 @@ void test_reg_walk_stream() {
             memcpy(&data_bytes, buf.data() + pos + 8, 4);
             pos += 12;
             if (pos + name_bytes + data_bytes > buf.size()) { ok = false; break; }
+            std::wstring name((const wchar_t*)(buf.data() + pos), name_bytes / sizeof(wchar_t));
+            const BYTE* data = buf.data() + pos + name_bytes;
+            if (name == L"AString" && type == REG_SZ) {
+                saw_string = std::wstring((const wchar_t*)data,
+                                          data_bytes / sizeof(wchar_t)).rfind(L"hello", 0) == 0;
+            } else if (name == L"ANumber" && type == REG_DWORD && data_bytes == 4) {
+                DWORD v; memcpy(&v, data, 4);
+                saw_dword = (v == 1234);
+            } else if (name == L"ABlob" && type == REG_BINARY && data_bytes == 3) {
+                saw_binary = (data[0] == 1 && data[1] == 2 && data[2] == 3);
+            }
             pos += name_bytes + data_bytes;
             ++values;
         }
         if (!ok) break;
         ++keys;
     }
+
     CHECK(ok);
     CHECK(pos == buf.size());   // the stream must consume exactly, no slack
-    CHECK(keys >= 1);
+    CHECK(keys == 2);           // the key itself plus Child, at depth 1
+    CHECK(values == 4);
+    CHECK(saw_child);
+    CHECK(saw_string);
+    CHECK(saw_dword);
+    CHECK(saw_binary);
     printf("  (reg_walk: %zu keys, %zu values, %zu bytes)\n", keys, values, buf.size());
+
+    drop_fixture();
 }
 
 // --- struct layout ----------------------------------------------------------
