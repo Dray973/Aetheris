@@ -8,8 +8,8 @@ PANIC or the Un-isolate button).
 from __future__ import annotations
 
 import psutil
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
     QHBoxLayout,
@@ -207,7 +207,7 @@ class NetworkTab(QWidget):
             return
         labels = sorted({r.split(":", 1)[1].rsplit("(", 1)[0].strip()
                          for r in active if ":" in r})
-        from PyQt6.QtWidgets import QInputDialog
+        from PySide6.QtWidgets import QInputDialog
         label, ok = QInputDialog.getItem(self, "Un-isolate", "Application:", labels, 0, False)
         if ok and label:
             self._run(firewall.deisolate, self._show_deisolate, label)

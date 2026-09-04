@@ -1,6 +1,6 @@
 # Aetheris Quantum Core — dependencies
 # Required for the GUI + core telemetry to run:
-PyQt6>=6.6
+PySide6>=6.6
 psutil>=5.9
 
 # Recommended (features degrade gracefully if missing):

@@ -15,7 +15,7 @@ def _make_source_zip(zip_path: Path, version: str = "9.9.9",
         if valid:
             zf.writestr(f"{root}/run.py", "print('new')\n")
             zf.writestr(f"{root}/aetheris/__init__.py", f'__version__ = "{version}"\n')
-            zf.writestr(f"{root}/requirements.txt", "PyQt6\n")
+            zf.writestr(f"{root}/requirements.txt", "PySide6\n")
             zf.writestr(f"{root}/README.md", "# Aetheris\n")
             zf.writestr(f"{root}/pyproject.toml", f'version = "{version}"\n')
         else:
@@ -212,13 +212,13 @@ def test_requirements_changed(tmp_path):
     # staged has no requirements -> nothing to refresh
     assert updater.requirements_changed(root, staged) is False
     # install has none, staged adds one -> refresh
-    (staged / "requirements.txt").write_text("PyQt6\npsutil\n")
+    (staged / "requirements.txt").write_text("PySide6\npsutil\n")
     assert updater.requirements_changed(root, staged) is True
     # identical (modulo comments/whitespace) -> no refresh
-    (root / "requirements.txt").write_text("# deps\nPyQt6\n  psutil  \n")
+    (root / "requirements.txt").write_text("# deps\nPySide6\n  psutil  \n")
     assert updater.requirements_changed(root, staged) is False
     # a genuine change -> refresh
-    (staged / "requirements.txt").write_text("PyQt6\npsutil\nyara-python\n")
+    (staged / "requirements.txt").write_text("PySide6\npsutil\nyara-python\n")
     assert updater.requirements_changed(root, staged) is True
 
 
@@ -227,7 +227,7 @@ def test_source_swap_script_refreshes_deps_when_requested(tmp_path):
     staged = tmp_path / "staged-src"
     (staged / "aetheris").mkdir(parents=True)
     (staged / "run.py").write_text("x")
-    (staged / "requirements.txt").write_text("PyQt6\n")
+    (staged / "requirements.txt").write_text("PySide6\n")
     log = tmp_path / "pip.log"
     script = updater._source_swap_script(
         str(tmp_path / "pythonw.exe"), root, staged,

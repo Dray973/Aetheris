@@ -121,7 +121,7 @@ function Install-Tier([string]$name, [string[]]$packages, [bool]$required) {
     }
 }
 
-Install-Tier 'core'        @('PyQt6>=6.6','psutil>=5.9') $true
+Install-Tier 'core'        @('PySide6>=6.6','psutil>=5.9') $true
 Install-Tier 'recommended' @('numpy>=1.24','pyqtgraph>=0.13','pywin32>=306','comtypes>=1.2','PyOpenGL>=3.1') $false
 Install-Tier 'forensics'   @('capstone>=5.0','keystone-engine>=0.9','memprocfs>=5.0') $false
 

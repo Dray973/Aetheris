@@ -10,13 +10,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 
 class Worker(QThread):
-    done = pyqtSignal(object)
-    failed = pyqtSignal(str)
-    progress = pyqtSignal(str)
+    done = Signal(object)
+    failed = Signal(str)
+    progress = Signal(str)
 
     def __init__(self, fn: Callable[..., Any], *args, **kwargs) -> None:
         super().__init__()

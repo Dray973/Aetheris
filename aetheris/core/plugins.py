@@ -94,7 +94,7 @@ def plugin(name: str, description: str = "") -> Callable[[Callable[..., Any]], P
 
 def widget_plugin(name: str, description: str = "") -> Callable[[Callable[..., Any]], Plugin]:
     """
-    Decorator: wrap ``def factory() -> QWidget`` as a GUI Plugin. Import PyQt6
+    Decorator: wrap ``def factory() -> QWidget`` as a GUI Plugin. Import PySide6
     *inside* the factory (lazily) so the headless CLI can still discover the
     plugin without pulling in Qt.
     """

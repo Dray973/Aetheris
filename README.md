@@ -1,6 +1,6 @@
 # Aetheris Quantum Core — Advanced Systems Instrumentation Suite
 
-A unified, PyQt6 desktop workspace that merges process/memory forensics, raw
+A unified, PySide6 desktop workspace that merges process/memory forensics, raw
 storage surgery, live network/firewall control, registry engineering, and a
 natural-language automation shell into one dashboard. It targets power users,
 security researchers, and systems administrators operating on machines they
@@ -78,7 +78,7 @@ aetheris/
 │                  every call falls back to pure Python when a DLL is absent
 ├── plugins/       built-in extension tools (top-memory, public-connections, …) + permissions
 ├── cli.py         headless forensic capture (`aetheris-cli`, also `<exe> cli …`)
-└── ui/            PyQt6 window, theme, dropdown module navigator (tabdeck), log drawer, module tabs
+└── ui/            PySide6 window, theme, dropdown module navigator (tabdeck), log drawer, module tabs
 agent/             native C++ API-monitor agent DLL (injected) + its build script
 native/            the two native engines + one build script for both:
                      aetheris_core/  Rust — entropy, byte search, PE parse/carve,
@@ -180,7 +180,7 @@ pip install .[full]                    # or .[recommended] to skip heavy wheels
 aetheris                               # GUI entry point (or: python run.py)
 ```
 
-`PyQt6` and `psutil` are required for the GUI. `pywin32`, `comtypes`,
+`PySide6` and `psutil` are required for the GUI. `pywin32`, `comtypes`,
 `pyqtgraph`, `capstone`, `keystone-engine`, `memprocfs`, and `yara-python` unlock
 additional features and degrade gracefully when absent (the UI tells you what's missing).
 
@@ -195,7 +195,7 @@ The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
 intent routing, MFT run-list/fixup parsing + fragmented-$MFT walk + tree
 aggregation (plus a **hypothesis fuzz** of the binary parser against malformed
 run-lists/records), the **Qt-free** treemap squarify layout (imports and runs
-with no PyQt6 installed), registry diffing, dedupe, the memory hex formatter,
+with no PySide6 installed), registry diffing, dedupe, the memory hex formatter,
 per-process bandwidth attribution math, GeoIP field extraction (plus a real
 GeoLite2 lookup when a DB is present), the cascading-menu spec parser, the
 settings store and report serializers, the **tamper-evident hash-chained audit

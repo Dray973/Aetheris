@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import QByteArray, Qt
-from PyQt6.QtGui import QAction, QIcon, QKeySequence, QShortcut
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
     QLabel,
@@ -197,7 +197,7 @@ class MainWindow(QMainWindow):
         from ..core import updater
         url = updater.effective_update_url()
         if not url:
-            from PyQt6.QtWidgets import QInputDialog
+            from PySide6.QtWidgets import QInputDialog
             url, ok = QInputDialog.getText(
                 self, "Update source",
                 "Update source (github:owner/repo, or a version.json https:// / file:// URL):")

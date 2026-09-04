@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
-from PyQt6.QtWidgets import (
+from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
+from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QHBoxLayout,

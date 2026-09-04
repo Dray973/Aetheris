@@ -10,9 +10,9 @@ tagged with a MITRE ATT&CK technique and the reversible responses to apply.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
     QHeaderView,

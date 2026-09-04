@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PyQt6.QtCore import QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
+from PySide6.QtWidgets import QWidget
 
 from .treemap_layout import squarify
 
@@ -40,7 +40,7 @@ class _Tile:
 
 
 class TreemapWidget(QWidget):
-    pathChanged = pyqtSignal(str)
+    pathChanged = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)

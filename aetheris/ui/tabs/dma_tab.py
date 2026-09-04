@@ -13,7 +13,7 @@ use only — systems you own or are cleared to test.
 """
 from __future__ import annotations
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,

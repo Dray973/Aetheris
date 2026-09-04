@@ -27,8 +27,8 @@ sys.path.insert(0, str(REPO))
 OUT = REPO / "docs" / "screenshots"
 OUT.mkdir(parents=True, exist_ok=True)
 
-from PyQt6.QtCore import QEventLoop, QTimer  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
+from PySide6.QtCore import QEventLoop, QTimer  # noqa: E402
+from PySide6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 
 from aetheris.analysis.findings import Finding  # noqa: E402
 from aetheris.core import timeline as tl  # noqa: E402

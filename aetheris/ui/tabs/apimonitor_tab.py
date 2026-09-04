@@ -11,9 +11,9 @@ only.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QHBoxLayout,
@@ -47,7 +47,7 @@ _API_COLOR = {
 
 
 class ApiMonitorTab(QWidget):
-    _event = pyqtSignal(object)
+    _event = Signal(object)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)

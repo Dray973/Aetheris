@@ -25,8 +25,8 @@ if SELFTEST:
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PyQt6.QtCore import QTimer  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QTabWidget  # noqa: E402
+from PySide6.QtCore import QTimer  # noqa: E402
+from PySide6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 
 from aetheris.forensics.processes import ProcessInfo  # noqa: E402
 from aetheris.network.connections import Connection  # noqa: E402

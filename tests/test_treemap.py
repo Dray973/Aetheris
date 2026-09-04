@@ -1,7 +1,7 @@
 """Squarified treemap layout: exact area coverage and in-bounds rectangles.
 
 The layout math lives in the Qt-free ``aetheris.ui.treemap_layout`` module, so
-these pure-geometry tests import and run without PyQt6 (proved by
+these pure-geometry tests import and run without PySide6 (proved by
 ``test_layout_imports_with_no_qt`` below).
 """
 import importlib
@@ -34,19 +34,19 @@ def test_squarify_proportional_to_value():
     assert placed["big"] > placed["small"] * 5
 
 
-class _BlockPyQt6:
-    """meta_path finder that makes any PyQt6 import fail, to simulate a box
+class _BlockPySide6:
+    """meta_path finder that makes any PySide6 import fail, to simulate a box
     with no Qt installed."""
     def find_spec(self, name, path=None, target=None):
-        if name == "PyQt6" or name.startswith("PyQt6."):
+        if name == "PySide6" or name.startswith("PySide6."):
             raise ModuleNotFoundError(f"No module named {name!r} (blocked for test)")
 
 
 @pytest.fixture
 def no_qt():
-    finder = _BlockPyQt6()
+    finder = _BlockPySide6()
     saved = {k: v for k, v in list(sys.modules.items())
-             if k == "PyQt6" or k.startswith(("PyQt6.", "aetheris.ui"))}
+             if k == "PySide6" or k.startswith(("PySide6.", "aetheris.ui"))}
     for k in saved:
         del sys.modules[k]
     sys.meta_path.insert(0, finder)
