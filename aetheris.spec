@@ -50,10 +50,15 @@ datas = [("aetheris/ui/assets/aetheris.ico", "aetheris/ui/assets")]
 if os.path.exists("dist/aetheris_agent.dll"):
     datas.append(("dist/aetheris_agent.dll", "."))
 
-# Bundle the native (Rust) scan accelerator if built (native/build.ps1 →
-# dist/aetheris_scan.dll). Optional — nativescan.py falls back to pure Python.
-if os.path.exists("dist/aetheris_scan.dll"):
-    datas.append(("dist/aetheris_scan.dll", "."))
+# Bundle the native engines if built (native/build.ps1 → dist/). Both are
+# optional: aetheris.native.loader looks for them next to sys._MEIPASS and the
+# callers fall back to pure Python when they are absent.
+#
+#   aetheris_core.dll — Rust analysis core (entropy, search, PE, MFT)
+#   aetheris_win.dll  — C++ Win32 engine (processes, memory, handles, registry)
+for _dll in ("aetheris_core.dll", "aetheris_win.dll"):
+    if os.path.exists(f"dist/{_dll}"):
+        datas.append((f"dist/{_dll}", "."))
 
 a = Analysis(
     ["run.py"],
