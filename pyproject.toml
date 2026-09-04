@@ -66,6 +66,14 @@ aetheris = ["ui/assets/*.ico"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# `slow` marks the large native/Python parity sweeps over live system data.
+# They are NOT excluded by default: they are the tests that found every
+# value-decoding divergence, and hiding them behind an opt-in flag is how they
+# would stop being run. Skip them during tight iteration with
+#   pytest -m "not slow"
+markers = [
+    "slow: large parity sweeps over live registry / binaries / MFT records",
+]
 
 [tool.ruff]
 line-length = 110          # PyQt6 flag/enum calls are legitimately verbose
