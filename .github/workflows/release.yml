@@ -36,9 +36,19 @@ jobs:
       - name: Build the API-monitor agent DLL (MSVC)
         run: powershell -ExecutionPolicy Bypass -File agent\build.ps1
 
-      - name: Build the native scan lib (Rust)
-        continue-on-error: true   # optional accelerator — nativescan falls back to pure Python
-        run: powershell -ExecutionPolicy Bypass -File native\build.ps1
+      # -Strict, and no continue-on-error: a release that silently shipped
+      # without the engines would degrade to pure Python with nothing to show
+      # for it. CI's `native` job already proves both build on windows-latest,
+      # so a failure here is a real problem rather than a missing optional
+      # accelerator.
+      - name: Build the native engines (Rust core + C++ Win32)
+        run: powershell -ExecutionPolicy Bypass -File native\build.ps1 -Strict
+
+      - name: Verify the engines will be bundled
+        run: |
+          if (-not (Test-Path dist\aetheris_core.dll)) { throw "aetheris_core.dll missing" }
+          if (-not (Test-Path dist\aetheris_win.dll)) { throw "aetheris_win.dll missing" }
+          Write-Host "both engines present for bundling"
 
       - name: Build one-file executable
         run: pyinstaller --noconfirm --clean aetheris.spec
