@@ -115,9 +115,32 @@ whole-machine sweep safe.
 **What is deliberately *not* native**, and why — each of these was measured or
 assessed and left in Python on purpose:
 
+Run `python native\bench.py` for the current numbers on your machine. Measured
+here (best of 5, ratio = Python ÷ native, so >1 means native wins):
+
+| operation | ratio | |
+| --- | --- | --- |
+| entropy (8 MB) | **84x** | |
+| PE carve (8 MB) | **15x** | |
+| services | **3.9x** | |
+| MFT block parse | **2.1x** | |
+| process enumeration | 1.7x | |
+| registry snapshot | 1.3x | |
+| memory map | 1.3x | |
+| Authenticode | 1.2x | |
+| connections | 1.1x | |
+| drivers | 0.9–1.1x | at parity; kept because it shares the services path |
+| byte search | 0.46x | Python's two-way search wins — `find` uses it |
+| SHA-256 | 0.09x | hashlib's SHA-NI wins — `sha256` uses it |
+| handle table (system-wide) | — | no Python equivalent |
+
+The bottom three rows are why the benchmark is committed: each was a port
+proposed on a predicted win that measurement did not support.
+
 | Module | Reason |
 | --- | --- |
 | `storage/dedupe` | `hashlib` reaches 3.2 GB/s via OpenSSL's SHA-NI instructions; a portable Rust SHA-256 measured 277 MB/s, ~11x slower |
+| `core/autoruns` | Reads 4 keys holding ~19 values, not a tree. Measured 2.8x *slower* natively — FFI overhead exceeds the work |
 | `core/audit` | The tamper-evident chain hashes a byte-exact `json.dumps`; reimplementing that encoding elsewhere would create a security-critical compatibility surface for a rarely-run verify |
 | `analysis/findings` | Duck-typed correlation over a few hundred objects — marshaling them across the boundary would cost more than the work |
 | `core/timeline` | Set arithmetic, already at C speed in CPython |
