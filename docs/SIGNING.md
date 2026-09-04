@@ -41,9 +41,17 @@ with the same `signtool sign` command after compiling it.
 ## Sign in CI
 
 `.github/workflows/release.yml` signs both artifacts on a tagged release using
-**Azure Trusted Signing**, not a `.pfx`. All five secrets must be set (Settings
-→ Secrets and variables → Actions); the signing steps are skipped when
-`AZURE_CLIENT_ID` is empty:
+**Azure Artifact Signing**, not a `.pfx`.
+
+> The service has been renamed twice: Azure Code Signing → Trusted Signing →
+> **Artifact Signing**. In the portal, search for **"Artifact Signing
+> Accounts"** — searching "Trusted Signing" finds nothing useful. The
+> underlying resource type is unchanged
+> (`Microsoft.CodeSigning/codesigningaccounts`), and the GitHub action moved to
+> `Azure/artifact-signing-action` accordingly.
+
+All six secrets must be set (Settings → Secrets and variables → Actions); the
+signing steps are skipped when `AZURE_CLIENT_ID` is empty:
 
 | Secret | Value |
 |---|---|
@@ -55,7 +63,19 @@ with the same `signtool sign` command after compiling it.
 | `TRUSTED_SIGNING_PROFILE` | certificate profile name within that account |
 
 The service principal needs the **Trusted Signing Certificate Profile Signer**
-role on the account.
+role on the signing account (the role kept its old name through the rebrand).
+
+Order matters, and the first step is the slow one:
+
+1. Create an **Artifact Signing Account** (regions are limited: East US,
+   West US 3, West Central US, North Europe, West Europe).
+2. Complete **Identity validation** — Individual or Organisation. Microsoft
+   reviews this manually and it takes days. Nothing below is possible until it
+   reads *Completed*.
+3. Create a **Certificate profile** of type Public Trust. This blade is only
+   usable after step 2.
+4. Register an app in Entra ID and generate a client secret.
+5. Grant that app the signer role on the account (step above).
 
 > Earlier revisions of this page described `SIGN_PFX_BASE64` / `SIGN_PASSWORD`.
 > The workflow has never read those. Setting them produces a green release with

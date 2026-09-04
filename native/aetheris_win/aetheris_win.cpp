@@ -455,6 +455,21 @@ AW_EXPORT void aw_reset_cache() {
         g_proc_cache.clear();
     }
     {
+        // Forget which *source* handles timed out, but keep the record of
+        // duplicates abandoned into this process.
+        //
+        // The two are not equally trustworthy. An abandoned duplicate is
+        // provably wedged — a thread is still blocked inside NtQueryObject on
+        // it — and re-querying it would hang again, so that list must survive.
+        // A hung *source* is a single observation under whatever load happened
+        // to exist, and a short timeout turns an ordinary slow handle into a
+        // permanent blacklist entry. Keeping those forever means one unlucky
+        // moment stops a handle ever being named again for the life of the
+        // process.
+        std::lock_guard<std::mutex> lock(g_abandoned_mutex);
+        g_hung_sources.clear();
+    }
+    {
         std::lock_guard<std::mutex> lock(g_cat_mutex);
         if (g_cat_admin) {
             CryptCATAdminReleaseContext(g_cat_admin, 0);
