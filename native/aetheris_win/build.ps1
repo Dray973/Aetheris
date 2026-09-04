@@ -7,9 +7,14 @@
     development with C++"). Located automatically via vswhere. The library is
     optional — the app falls back to the pure-Python implementations when it
     isn't present — so a missing toolchain is not fatal to a build.
+
+    Pass -Tests to also build and run the C++ self-tests (tests.cpp). Those
+    cover the engine's internal helpers — buffer truncation, UNICODE_STRING
+    bounds rejection, the packed registry stream layout — which the Python
+    suites cannot reach because they live in anonymous namespaces.
 #>
 [CmdletBinding()]
-param([string] $Config = 'Release')
+param([string] $Config = 'Release', [switch] $Tests)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -41,3 +46,18 @@ foreach ($ext in '.lib', '.exp') {
 }
 $kb = [math]::Round((Get-Item $out).Length / 1KB, 1)
 Write-Host "  + Built $out ($kb KB)" -ForegroundColor Green
+
+if ($Tests) {
+    # tests.cpp #includes the implementation to reach its anonymous-namespace
+    # helpers, so the exe is built from that single translation unit. The test
+    # binary stays in TEMP — it is never shipped.
+    $testSrc = Join-Path $PSScriptRoot 'tests.cpp'
+    $testExe = Join-Path $obj 'aetheris_win_tests.exe'
+    Write-Host "==> Compiling $testSrc" -ForegroundColor Cyan
+    cmd /c "`"$vcvars`" && cl /nologo $opt /EHsc /std:c++17 /W4 /Fo:`"$obj\t_`" `"$testSrc`" /Fe:`"$testExe`""
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $testExe)) { throw "test build failed (exit $LASTEXITCODE)." }
+    Write-Host "==> Running self-tests" -ForegroundColor Cyan
+    & $testExe
+    if ($LASTEXITCODE -ne 0) { throw "aetheris_win self-tests failed (exit $LASTEXITCODE)." }
+    Write-Host "  + self-tests passed" -ForegroundColor Green
+}
