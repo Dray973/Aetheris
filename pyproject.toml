@@ -10,11 +10,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Aetheris" }]
-keywords = ["forensics", "sysadmin", "windows", "instrumentation", "pyqt6"]
+keywords = ["forensics", "sysadmin", "windows", "instrumentation", "pyside6"]
 
 # Minimum runtime for the GUI + core telemetry.
 dependencies = [
-    "PyQt6>=6.6",
+    "PySide6>=6.6",
     "psutil>=5.9",
 ]
 
@@ -76,7 +76,7 @@ markers = [
 ]
 
 [tool.ruff]
-line-length = 110          # PyQt6 flag/enum calls are legitimately verbose
+line-length = 110          # Qt flag/enum calls are legitimately verbose
 target-version = "py310"
 
 [tool.ruff.lint]
@@ -112,7 +112,7 @@ ignore_missing_imports = true
 strict = true
 
 [[tool.mypy.overrides]]
-# The PyQt6 UI layer + the one Qt-based plugin: PyQt6's stubs emit false overload
+# The Qt UI layer + the one Qt-based plugin: the Qt stubs emit false overload
 # / signal-typing errors (QLabel(objectName=...), QByteArray, nullable
 # QTableWidgetItem) that don't reflect real bugs.
 module = ["aetheris.ui.*", "aetheris.plugins.system_gauges"]

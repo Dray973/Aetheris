@@ -9,9 +9,9 @@ dialogs and the audit log.
 from __future__ import annotations
 
 import psutil
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QHeaderView,

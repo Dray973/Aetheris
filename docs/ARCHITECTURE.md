@@ -9,7 +9,7 @@ are cross-cutting: every layer publishes to them, and the UI subscribes.
 
 ```mermaid
 flowchart TB
-    subgraph UI["ui · PyQt6 presentation"]
+    subgraph UI["ui · PySide6 presentation"]
         MW["MainWindow + module tabs"]
         VIS["TelemetryChart · Treemap · Log drawer"]
         WK["QThread Worker (keeps the UI thread unblocked)"]

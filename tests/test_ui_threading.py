@@ -53,7 +53,7 @@ def _assert_offloaded(qtbot, tab, fire, patch_target, attr, monkeypatch, result)
 
 
 def test_strip_handles_offloaded(qtbot, monkeypatch, tmp_path):
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from aetheris.storage import unlock
     from aetheris.ui.tabs.storage_tab import StorageTab
@@ -71,7 +71,7 @@ def test_strip_handles_offloaded(qtbot, monkeypatch, tmp_path):
 
 
 def test_disable_diagtrack_offloaded(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from aetheris.core import registry
     from aetheris.ui.tabs.shell_tab import ShellTab
@@ -86,7 +86,7 @@ def test_disable_diagtrack_offloaded(qtbot, monkeypatch):
 
 
 def test_trim_working_sets_offloaded(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from aetheris.forensics import memory
     from aetheris.ui.tabs.memory_tab import MemoryTab
@@ -103,7 +103,7 @@ def test_trim_working_sets_offloaded(qtbot, monkeypatch):
 
 
 def test_service_control_offloaded(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from aetheris.core import services
     from aetheris.core.services import ServiceInfo
@@ -122,7 +122,7 @@ def test_service_control_offloaded(qtbot, monkeypatch):
 
 
 def test_task_control_offloaded(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from aetheris.core import taskaudit
     from aetheris.core.taskaudit import TaskInfo
@@ -142,7 +142,7 @@ def test_task_control_offloaded(qtbot, monkeypatch):
 
 
 def test_persistence_control_offloaded(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from aetheris.core import persistence
     from aetheris.core.persistence import PersistenceEntry
@@ -171,7 +171,7 @@ def test_timeline_capture_offloaded(qtbot, monkeypatch):
 
 
 def test_untrusted_plugin_run_is_gated(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     from aetheris.core.plugins import Plugin
     from aetheris.ui.tabs.plugins_tab import PluginsTab

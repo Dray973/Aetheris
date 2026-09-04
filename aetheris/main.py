@@ -2,7 +2,7 @@
 Application bootstrap: build the QApplication and show the main window.
 
 Kept import-light at module top so ``python -c "import aetheris.main"`` works
-for smoke tests even where PyQt6 isn't installed; the heavy imports happen
+for smoke tests even where PySide6 isn't installed; the heavy imports happen
 inside run_app().
 """
 from __future__ import annotations
@@ -12,13 +12,13 @@ import sys
 
 def run_app() -> int:
     try:
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
     except Exception as exc:  # pragma: no cover
-        print("PyQt6 is required to launch the GUI. Install with: pip install PyQt6")
+        print("PySide6 is required to launch the GUI. Install with: pip install PySide6")
         print(f"(import error: {exc})")
         return 2
 
-    from PyQt6.QtGui import QIcon
+    from PySide6.QtGui import QIcon
 
     from .core import crashreport
     from .ui.mainwindow import ICON_PATH, MainWindow

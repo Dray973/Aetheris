@@ -10,8 +10,8 @@ keep working unchanged. Inner per-tab sub-panels stay real ``QTabWidget``s.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 
 
 class TabDeck(QWidget):
-    currentChanged = pyqtSignal(int)
+    currentChanged = Signal(int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

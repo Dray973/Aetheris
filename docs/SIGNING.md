@@ -40,16 +40,32 @@ with the same `signtool sign` command after compiling it.
 
 ## Sign in CI
 
-`.github/workflows/release.yml` signs both artifacts on a tagged release when two
-repository secrets are set (Settings → Secrets and variables → Actions):
+`.github/workflows/release.yml` signs both artifacts on a tagged release using
+**Azure Trusted Signing**, not a `.pfx`. All five secrets must be set (Settings
+→ Secrets and variables → Actions); the signing steps are skipped when
+`AZURE_CLIENT_ID` is empty:
 
 | Secret | Value |
 |---|---|
-| `SIGN_PFX_BASE64` | your `.pfx`, base64-encoded (`[Convert]::ToBase64String([IO.File]::ReadAllBytes('cert.pfx'))`) |
-| `SIGN_PASSWORD`   | the `.pfx` password |
+| `AZURE_TENANT_ID` | the Entra tenant holding the signing identity |
+| `AZURE_CLIENT_ID` | app registration (service principal) client ID |
+| `AZURE_CLIENT_SECRET` | that app registration's client secret |
+| `TRUSTED_SIGNING_ENDPOINT` | e.g. `https://eus.codesigning.azure.net` |
+| `TRUSTED_SIGNING_ACCOUNT` | Trusted Signing account name |
+| `TRUSTED_SIGNING_PROFILE` | certificate profile name within that account |
 
-If `SIGN_PFX_BASE64` is empty the signing step is skipped and unsigned binaries
-are published — so the pipeline works before you have a certificate.
+The service principal needs the **Trusted Signing Certificate Profile Signer**
+role on the account.
+
+> Earlier revisions of this page described `SIGN_PFX_BASE64` / `SIGN_PASSWORD`.
+> The workflow has never read those. Setting them produces a green release with
+> silently unsigned binaries, which is the worst of both outcomes — check the
+> `Sign the app exe` step's status in the release run rather than assuming.
+
+**Releases through v0.3.0 are unsigned**, because these secrets are not set on
+the repository. Windows SmartScreen will warn on first run. For a security tool
+that is a poor default: users learn to click through exactly the warning that
+protects them.
 
 ## Verify a signature
 

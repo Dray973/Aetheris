@@ -3,9 +3,9 @@ Pure squarified-treemap geometry (no Qt, no OS dependencies).
 
 The squarify algorithm (Bruls, Huizing & van Wijk) lays a list of weighted
 items out as area-proportional rectangles with good aspect ratios. This module
-is deliberately import-clean -- it pulls in nothing from PyQt6 or the platform,
+is deliberately import-clean -- it pulls in nothing from PySide6 or the platform,
 so the layout math is unit-testable anywhere, including machines without a
-display or PyQt6 installed. The Qt canvas in ``treemap.py`` imports ``squarify``
+display or PySide6 installed. The Qt canvas in ``treemap.py`` imports ``squarify``
 from here.
 """
 from __future__ import annotations

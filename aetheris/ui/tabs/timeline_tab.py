@@ -7,9 +7,9 @@ Worker so the UI never blocks; the diff reuses the registry-diff colour scheme.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QHBoxLayout,

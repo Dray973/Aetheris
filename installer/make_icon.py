@@ -16,8 +16,8 @@ import math
 import os
 import struct
 
-from PyQt6.QtCore import QBuffer, QByteArray, QPointF, QRectF, Qt
-from PyQt6.QtGui import (
+from PySide6.QtCore import QBuffer, QByteArray, QPointF, QRectF, Qt
+from PySide6.QtGui import (
     QBrush,
     QColor,
     QImage,
@@ -26,7 +26,7 @@ from PyQt6.QtGui import (
     QPolygonF,
     QRadialGradient,
 )
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 SIZES = [16, 24, 32, 48, 64, 128, 256]
 BG = QColor("#0b0e14")

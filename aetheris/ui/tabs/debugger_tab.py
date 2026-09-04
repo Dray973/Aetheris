@@ -10,8 +10,8 @@ the GUI via a queued signal. Authorized use only.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
     QHBoxLayout,
@@ -53,7 +53,7 @@ def _parse_hex_bytes(text: str) -> bytes | None:
 
 
 class DebuggerTab(QWidget):
-    _event = pyqtSignal(object)
+    _event = Signal(object)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)

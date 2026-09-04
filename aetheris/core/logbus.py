@@ -6,7 +6,7 @@ in the suite routes a structured event through this single bus. The UI log
 drawer subscribes to it; because it is built on Qt signals, workers running on
 QThreads can emit from any thread and the slot is delivered on the GUI thread.
 
-If PyQt6 is unavailable (e.g. running a headless unit test), the bus degrades
+If PySide6 is unavailable (e.g. running a headless unit test), the bus degrades
 to stdout so the same ``log(...)`` calls keep working everywhere.
 """
 from __future__ import annotations
@@ -37,10 +37,10 @@ class LogEvent:
 
 
 try:
-    from PyQt6.QtCore import QObject, pyqtSignal
+    from PySide6.QtCore import QObject, Signal
 
     class _QtEmitter(QObject):
-        event = pyqtSignal(object)  # type: ignore[assignment]
+        event = Signal(object)  # type: ignore[assignment]
 
     _emitter: _QtEmitter | None = _QtEmitter()
     _HAS_QT = True
