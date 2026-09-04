@@ -13,8 +13,10 @@ jobs:
     name: Build Windows downloadables
     runs-on: windows-latest
     env:
-      # Azure Trusted Signing: set these repo secrets to sign the release
-      # binaries with a SmartScreen-trusted cert. Unset => unsigned build.
+      # Azure Artifact Signing (formerly Trusted Signing / Azure Code Signing).
+      # Set these repo secrets to sign the release binaries with a
+      # SmartScreen-trusted cert; unset => an unsigned build. See
+      # docs/SIGNING.md for the full secret list and the Azure-side setup.
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -68,15 +70,15 @@ jobs:
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
           Stop-Process -Id $p.Id -Force
 
-      - name: Sign the app exe (Azure Trusted Signing)
+      - name: Sign the app exe (Azure Artifact Signing)
         if: ${{ env.AZURE_CLIENT_ID != '' }}
-        uses: azure/trusted-signing-action@v0.5.1
+        uses: azure/artifact-signing-action@v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
           endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
-          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
           files-folder: ${{ github.workspace }}\dist
           files-folder-filter: exe
@@ -90,15 +92,15 @@ jobs:
       - name: Compile installer (AetherisSetup.exe)
         run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\aetheris.iss'
 
-      - name: Sign the installer (Azure Trusted Signing)
+      - name: Sign the installer (Azure Artifact Signing)
         if: ${{ env.AZURE_CLIENT_ID != '' }}
-        uses: azure/trusted-signing-action@v0.5.1
+        uses: azure/artifact-signing-action@v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
           endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
-          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
           files-folder: ${{ github.workspace }}\installer\Output
           files-folder-filter: exe
