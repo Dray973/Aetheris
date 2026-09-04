@@ -165,9 +165,15 @@ class DmaTab(QWidget):
         self._refresh_capabilities()
         if not getattr(backend.capabilities, "physical", False):
             self.out.appendPlainText(
-                "No PCILeech FPGA device initialized. Check the card's firmware "
-                "and that LeechCore + MemProcFS (pip install memprocfs) are "
-                "installed. Falling back to the software backend (no physical access).")
+                "No acquisition device initialized — falling back to the software "
+                "backend (no physical access).\n"
+                "  • 'fpga' needs a PCILeech-flashed FPGA board (Artix-7 100T / 35T, "
+                "Screamer PCIe Squirrel) seated in the TARGET machine and reached from "
+                "here over USB3 (FTDI FT601). An ordinary DAQ / digital-I/O or NIC card "
+                "cannot acquire memory, no matter which slot it is in.\n"
+                "  • 'pmem' reads THIS machine's RAM but needs the signed WinPMEM driver: "
+                "put winpmem_x64.sys beside leechcore.dll or set $AETHERIS_WINPMEM.\n"
+                "  • A raw or crash dump file also works as a device.")
 
     def _on_attach_failed(self, err: str) -> None:
         self.attach_btn.setEnabled(True)

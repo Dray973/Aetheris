@@ -20,14 +20,20 @@ A backend abstraction with two implementations behind one interface:
 from __future__ import annotations
 
 import ctypes
+import importlib.util
+import os
 from abc import ABC, abstractmethod
 from ctypes import wintypes
 from dataclasses import dataclass
+from pathlib import Path
 
 from ..core import logbus
 from ..core import winapi as W
+from ..native import win as nativewin
 
 SRC = "forensics.memvirt"
+
+_WINPMEM_NAMES = ("winpmem_x64.sys", "winpmem_x86.sys")
 
 
 @dataclass
@@ -91,6 +97,130 @@ def _protect_str(flags: int) -> str:
     return base
 
 
+def _package_dir(name: str) -> Path | None:
+    """Directory of an installed package, without importing it."""
+    try:
+        spec = importlib.util.find_spec(name)
+    except Exception:  # noqa: BLE001 - a broken/partial install must not raise here
+        return None
+    if spec is None or not spec.origin:
+        return None
+    return Path(spec.origin).resolve().parent
+
+
+def find_winpmem() -> str | None:
+    """
+    Locate the WinPMEM kernel driver that LeechCore's 'pmem' device loads.
+
+    Neither the ``memprocfs`` nor the ``leechcorepyc`` wheel ships
+    ``winpmem_x64.sys`` (it is a signed kernel driver), so a bare ``-device
+    pmem`` can never initialize: LeechCore takes the literal string as the
+    driver filename and reports "unable to locate the winpmem driver file
+    'pmem'". Discovery order mirrors the other optional engines:
+
+      1. $AETHERIS_WINPMEM (explicit path)
+      2. beside leechcore.dll / vmm.dll (LeechCore's own convention)
+      3. a ``drivers/`` folder next to the installed package
+      4. the current working directory
+    """
+    env = os.environ.get("AETHERIS_WINPMEM")
+    if env and os.path.isfile(env):
+        return str(Path(env).resolve())
+    roots = [d for d in (_package_dir("leechcorepyc"), _package_dir("memprocfs")) if d]
+    roots.append(Path(__file__).resolve().parent.parent / "drivers")
+    roots.append(Path.cwd())
+    for root in roots:
+        for name in _WINPMEM_NAMES:
+            p = root / name
+            if p.is_file():
+                return str(p)
+    return None
+
+
+def ft601_devices() -> int | None:
+    """
+    Count PCILeech-capable FTDI FT601 endpoints, or None if FTD3XX is missing.
+
+    LeechCore's 'fpga' device speaks FT601/FT2232H **over USB3** — never over
+    the host's own PCIe bus — so a DMA board is reachable only from the machine
+    at the other end of its USB cable. Asking FTDI directly turns the useless
+    generic "Initialization of vmm failed" into "no board is plugged in".
+    Counts FT601 only; an older FT2232H rig enumerates through FTD2XX instead,
+    so a zero here is a strong hint, not proof, and never blocks an attach.
+    """
+    d = _package_dir("leechcorepyc")
+    if d is None:
+        return None
+    for name in ("FTD3XX.dll", "FTD3XXWU.dll"):
+        lib_path = d / name
+        if not lib_path.is_file():
+            continue
+        try:
+            lib = ctypes.WinDLL(str(lib_path))
+            n = ctypes.c_ulong(0)
+            if lib.FT_CreateDeviceInfoList(ctypes.byref(n)) == 0:
+                return int(n.value)
+        except Exception:  # noqa: BLE001 - probing must never break an attach
+            continue
+    return None
+
+
+#: Selectable acquisition devices: (device string, label, needs a path/host).
+DEVICES: tuple[tuple[str, str, bool], ...] = (
+    ("fpga", "PCILeech FPGA — USB3/FT601 to a board in the target", False),
+    ("pmem", "WinPMEM — this machine's live RAM (needs winpmem_x64.sys)", False),
+    ("rawtcp", "LeechAgent over TCP — rawtcp://<host>", True),
+    ("hvsavedstate", "Hyper-V saved state — hvsavedstate://<file>", True),
+    ("vmware", "VMware guest — a .vmem / .vmss / .vmsn file", True),
+    ("usb3380", "USB3380 hardware DMA bridge", False),
+    ("totalmeltdown", "CVE-2018-1038 (unpatched Win7 x64 only)", False),
+    ("<file>", "Raw or crash dump file — .raw / .dmp / .core", True),
+)
+
+
+def probe_devices() -> list[tuple[str, bool, str]]:
+    """
+    Report which acquisition devices could plausibly work here, without
+    attaching. Returns ``(device, likely_available, reason)`` per entry —
+    cheap enough to run on every tab paint.
+    """
+    out: list[tuple[str, bool, str]] = []
+    ft = ft601_devices()
+    if ft is None:
+        fpga_ok, fpga_why = True, "FTDI FT601 driver not found — cannot pre-check"
+    elif ft > 0:
+        fpga_ok, fpga_why = True, f"{ft} FT601 device(s) connected"
+    else:
+        fpga_ok, fpga_why = False, ("no FT601 device on USB — connect the board's "
+                                    "USB3 port to this machine")
+    out.append(("fpga", fpga_ok, fpga_why))
+    driver = find_winpmem()
+    out.append(("pmem", bool(driver),
+                driver or "winpmem_x64.sys not found (set $AETHERIS_WINPMEM)"))
+    for dev, label, needs_arg in DEVICES:
+        if dev in ("fpga", "pmem"):
+            continue
+        out.append((dev, True, label if not needs_arg else f"{label} — supply a target"))
+    return out
+
+
+def _device_arg(dev: str) -> tuple[str, str]:
+    """
+    Expand a short device name into the string LeechCore actually expects.
+
+    Returns ``(device_arg, blocked_reason)``. A non-empty reason means the
+    device cannot possibly initialize on this host, so the caller skips it
+    instead of paying a native call that fails with a generic message.
+    """
+    if dev.lower() != "pmem":
+        return dev, ""
+    driver = find_winpmem()
+    if not driver:
+        return dev, ("winpmem driver not found — put winpmem_x64.sys beside "
+                     "leechcore.dll or set $AETHERIS_WINPMEM")
+    return f"pmem://{driver}", ""
+
+
 class MemoryBackend(ABC):
     name: str = "abstract"
     capabilities: Capabilities = Capabilities()
@@ -121,6 +251,12 @@ class LiveBackend(MemoryBackend):
     capabilities = Capabilities(physical=False, hidden_detection=False, page_tables=False)
 
     def list_processes(self) -> list[MemoryProcess]:
+        native = nativewin.enum_processes()
+        if native:
+            return [
+                MemoryProcess(pid=p.pid, name=p.name or "?", ppid=p.ppid, path=p.exe)
+                for p in native
+            ]
         import psutil
         out: list[MemoryProcess] = []
         for p in psutil.process_iter(["pid", "name", "ppid", "exe"]):
@@ -136,6 +272,23 @@ class LiveBackend(MemoryBackend):
     def memory_map(self, pid: int) -> list[MemoryRegion]:
         if not W.IS_WINDOWS:
             return []
+        # The native engine runs the same VirtualQueryEx walk without a ctypes
+        # round-trip per region, which matters on the processes that have tens
+        # of thousands of them. It returns raw Win32 constants and the labels
+        # are applied here, so both paths emit identical strings.
+        native = nativewin.memory_map(pid)
+        if native is not None:
+            regions = [
+                MemoryRegion(
+                    base=r.base, size=r.size,
+                    state=_STATE.get(r.state, hex(r.state)),
+                    protect=_protect_str(r.protect),
+                    type=_TYPE.get(r.type, "-"),
+                )
+                for r in native
+            ]
+            logbus.trace(SRC, f"mapped {len(regions)} regions for pid {pid} (native)")
+            return regions
         access = W.PROCESS_QUERY_INFORMATION | W.PROCESS_VM_READ
         h = W.kernel32.OpenProcess(access, False, pid)
         if not h:
@@ -175,6 +328,13 @@ class LiveBackend(MemoryBackend):
     def read(self, pid: int, address: int, size: int) -> bytes | None:
         if not W.IS_WINDOWS:
             return None
+        if nativewin.available():
+            data = nativewin.read_memory(pid, address, size)
+            if data is None:
+                # Same outcome the ctypes path below would reach, minus a second
+                # OpenProcess; keep the trace so a failed read is still visible.
+                logbus.trace(SRC, f"read @0x{address:x} failed (native)")
+            return data
         h = W.kernel32.OpenProcess(W.PROCESS_VM_READ | W.PROCESS_QUERY_INFORMATION,
                                    False, pid)
         if not h:
@@ -205,8 +365,9 @@ class MemProcFSBackend(MemoryBackend):
     def try_create(cls, device: str | None = None) -> MemProcFSBackend | None:
         """
         Attempt to initialize MemProcFS. ``device`` is a raw/crash dump path, or
-        a live-acquisition device: 'fpga' (a PCILeech FPGA DMA card, e.g. an
-        Artix-7 100T board) or 'pmem' (the WinPMEM driver). Returns None (so the
+        a live-acquisition device: 'fpga' (a PCILeech-flashed FPGA DMA card,
+        e.g. an Artix-7 100T board, reached over USB3/FT601) or 'pmem' (the
+        WinPMEM driver, located by :func:`find_winpmem`). Returns None (so the
         caller falls back to LiveBackend) on any failure.
         """
         try:
@@ -219,18 +380,31 @@ class MemProcFSBackend(MemoryBackend):
         for dev in candidates:
             if not dev:
                 continue
+            arg, blocked = _device_arg(dev)
+            if blocked:
+                logbus.trace(SRC, f"MemProcFS device '{dev}' unavailable", blocked)
+                continue
             try:
-                vmm = memprocfs.Vmm(["-device", dev])
+                vmm = memprocfs.Vmm(["-device", arg])
                 backend = cls(vmm, device=dev)
                 backend.capabilities = Capabilities(
                     physical=True, hidden_detection=True, page_tables=True,
-                    physical_write=dev in ("fpga", "pmem"),
+                    physical_write=dev.lower().split("://")[0] in ("fpga", "pmem"),
                 )
                 logbus.success(SRC, f"MemProcFS initialized on device '{dev}'")
                 return backend
             except Exception as exc:  # noqa: BLE001
-                logbus.trace(SRC, f"MemProcFS device '{dev}' unavailable", str(exc))
-        logbus.warn(SRC, "MemProcFS present but no acquisition device initialized")
+                detail = str(exc)
+                if dev.lower().startswith("fpga") and ft601_devices() == 0:
+                    detail += ("  — no FTDI FT601 device is connected over USB; a "
+                               "DMA board cannot be reached from the machine it is "
+                               "seated in, only from the far end of its USB3 cable")
+                logbus.trace(SRC, f"MemProcFS device '{dev}' unavailable", detail)
+        logbus.warn(
+            SRC, "MemProcFS present but no acquisition device initialized",
+            "'fpga' needs a PCILeech-flashed FPGA board reached over USB3/FT601 "
+            "(a DAQ or digital-I/O card cannot acquire memory); 'pmem' needs the "
+            "winpmem driver. Using the live Win32 backend — no physical access.")
         return None
 
     def list_processes(self) -> list[MemoryProcess]:

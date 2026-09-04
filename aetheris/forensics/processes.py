@@ -23,6 +23,7 @@ import psutil
 
 from ..core import dryrun, logbus, signing
 from ..core import winapi as W
+from ..native import win as nativewin
 
 SRC = "forensics.processes"
 
@@ -60,6 +61,12 @@ _ProcessASLRPolicy = 1
 def _query_mitigations(pid: int) -> tuple[str, str]:
     if not W.IS_WINDOWS:
         return "unknown", "unknown"
+    # The native engine does both policy queries behind one process handle.
+    # It returns None only when it isn't loaded — a *denied* query still comes
+    # back as ("unknown", "unknown"), same as the ctypes path below.
+    native = nativewin.process_mitigations(pid)
+    if native is not None:
+        return native
     h = W.kernel32.OpenProcess(W.PROCESS_QUERY_INFORMATION, False, pid)
     if not h:
         h = W.kernel32.OpenProcess(W.PROCESS_QUERY_LIMITED_INFORMATION, False, pid)

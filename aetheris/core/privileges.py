@@ -25,6 +25,7 @@ import sys
 from collections.abc import Iterable
 from ctypes import wintypes
 
+from ..native import win as nativewin
 from . import winapi as W
 
 FORENSICS_PRIVILEGES = (
@@ -81,6 +82,10 @@ def enable_privilege(name: str) -> tuple[bool, str]:
     """
     if not W.IS_WINDOWS:
         return False, "not supported on this platform"
+
+    native = nativewin.enable_privilege(name)
+    if native is not None:
+        return native
 
     hproc = W.kernel32.GetCurrentProcess()
     htok = wintypes.HANDLE()

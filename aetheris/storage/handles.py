@@ -25,6 +25,7 @@ from dataclasses import dataclass
 
 from ..core import logbus
 from ..core import winapi as W
+from ..native import win as nativewin
 
 SRC = "storage.handles"
 
@@ -182,6 +183,16 @@ def find_file_handles(path: str, pids: set[int]) -> list[tuple[int, int]]:
     target = to_device_path(path)
     if target is None:
         return []
+    # The native engine runs the whole search — enumerate, filter, resolve,
+    # compare — inside one call. The loop below pays an NtQueryObject round
+    # trip per handle from Python, which is why it has to be given a PID set
+    # to stay tractable at all; the engine can search every process.
+    native = nativewin.find_handles_by_name(target, pids)
+    if native is not None:
+        matches = [(e.pid, e.handle) for e in native]
+        logbus.trace(SRC, f"{len(matches)} handle(s) name {path} (native)")
+        return matches
+
     target = target.lower()
     matches: list[tuple[int, int]] = []
     drive_map = _drive_device_map()  # noqa: F841 (kept warm for clarity)
@@ -208,6 +219,12 @@ def find_file_handles(path: str, pids: set[int]) -> list[tuple[int, int]]:
 
 def close_handle_in_process(pid: int, handle_value: int) -> tuple[bool, str]:
     """Force-close a handle inside another process via DUPLICATE_CLOSE_SOURCE."""
+    native = nativewin.close_handle_in_process(pid, handle_value)
+    if native is not None:
+        if native:
+            logbus.action(SRC, f"force-closed handle 0x{handle_value:x} in pid {pid}")
+            return True, "closed"
+        return False, f"DuplicateHandle(CLOSE_SOURCE) failed for pid {pid}"
     hproc = W.kernel32.OpenProcess(W.PROCESS_DUP_HANDLE, False, pid)
     if not hproc:
         return False, f"OpenProcess(DUP) pid {pid} failed: {W.last_error_str()}"

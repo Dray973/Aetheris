@@ -22,6 +22,7 @@ from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Any
 
+from ..native import win as nativewin
 from . import dryrun, logbus, safety, signing
 
 SRC = "core.services"
@@ -148,8 +149,30 @@ def _loaded_driver_basenames() -> set[str]:
 
 def enumerate_services(check_signature: bool = True) -> list[ServiceInfo]:
     """Enumerate win32 services via the SCM (live state, start type, account)."""
-    import psutil
     out: list[ServiceInfo] = []
+    # The native engine runs EnumServicesStatusExW plus the per-service config
+    # query without returning to Python between them; psutil issues each
+    # QueryServiceConfig from Python.
+    native = nativewin.enum_services()
+    if native is not None:
+        for s in native:
+            binary = resolve_path(parse_binary(s.image_path))
+            rec = ServiceInfo(
+                name=s.name, display_name=s.display_name,
+                image_path=s.image_path, binary=binary,
+                # start_type_label, not the binding's own mapping: this module
+                # spells automatic start "auto" and the two must not diverge.
+                start_type=start_type_label(s.start_type),
+                kind="service", account=s.account,
+                state=s.state_label,
+                unquoted_path=has_unquoted_path_vuln(s.image_path, "service"))
+            if check_signature and binary:
+                rec.signed = signing.label(binary)
+            out.append(rec)
+        logbus.trace(SRC, f"enumerated {len(out)} services (native)")
+        return out
+
+    import psutil
     for svc in psutil.win_service_iter():
         try:
             info = svc.as_dict()
@@ -177,6 +200,28 @@ def enumerate_drivers(check_signature: bool = True) -> list[ServiceInfo]:
         return []
     loaded = _loaded_driver_basenames()
     out: list[ServiceInfo] = []
+
+    # One native call replaces ~700 subkey opens and ~4,900 QueryValueEx
+    # round-trips through winreg.
+    native = nativewin.enum_driver_services()
+    if native is not None:
+        for s in native:
+            if s.service_type not in _DRIVER_TYPES:
+                continue
+            binary = resolve_path(parse_binary(s.image_path))
+            base = os.path.basename(binary).lower()
+            rec = ServiceInfo(
+                name=s.name, display_name=s.display_name or s.name,
+                image_path=s.image_path, binary=binary,
+                start_type=start_type_label(s.start_type), kind="driver",
+                account=s.account,
+                state=("loaded" if base in loaded else "not loaded"))
+            if check_signature and binary:
+                rec.signed = signing.label(binary)
+            out.append(rec)
+        logbus.trace(SRC, f"enumerated {len(out)} drivers (native)")
+        return out
+
     try:
         root_key = winreg.OpenKey(_HKLM, _SERVICES_KEY)
     except OSError:

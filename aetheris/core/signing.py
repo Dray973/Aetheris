@@ -16,6 +16,7 @@ import os
 import threading
 from ctypes import wintypes
 
+from ..native import win as nativewin
 from . import logbus
 from . import winapi as W
 
@@ -122,6 +123,13 @@ def is_signed(path: str | None) -> bool | None:
 def _verify(path: str) -> bool | None:
     if not os.path.isfile(path):
         return None
+    # The native engine does the embedded check and the catalog lookup behind
+    # one call, reusing a single catalog admin context across files — the
+    # ctypes path below acquires and releases one per file, which dominates a
+    # services or autoruns sweep.
+    native = nativewin.verify_signature(path)
+    if native is not None:
+        return native in (nativewin.SIG_EMBEDDED, nativewin.SIG_CATALOG)
     file_info = _WINTRUST_FILE_INFO(cbStruct=ctypes.sizeof(_WINTRUST_FILE_INFO),
                                     pcwszFilePath=path, hFile=None, pgKnownSubject=None)
     data = _WINTRUST_DATA(

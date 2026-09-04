@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..native import win as nativewin
 from . import dryrun, logbus, safety
 
 SRC = "core.registry"
@@ -45,6 +46,21 @@ def snapshot_tree(root: str, subkey: str, max_depth: int = 6) -> dict[str, dict[
     hive = _HIVES.get(root.upper())
     if hive is None:
         raise ValueError(f"unknown root {root!r}")
+
+    # The native engine walks the subtree in one call. Only raw typed data
+    # comes back; repr() stays here, because snapshots are saved to disk and
+    # later diffed against ones taken through the loop below, so the rendering
+    # has to be produced by the same code on both paths.
+    native = nativewin.reg_snapshot(root, subkey, max_depth)
+    if native is not None:
+        rendered: dict[str, dict[str, Any]] = {
+            f"{root}\\{path}": {name: (repr(data), vtype)
+                                for name, (data, vtype) in values.items()}
+            for path, values in native.items()
+        }
+        logbus.trace(SRC, f"snapshot {root}\\{subkey}: {len(rendered)} keys (native)")
+        return rendered
+
     out: dict[str, dict[str, Any]] = {}
 
     def walk(path: str, depth: int) -> None:
