@@ -385,12 +385,19 @@ def find_handles_by_name(target: str, pids: set[int] | None = None,
     None means the engine is absent so the caller should fall back. The search
     runs entirely inside the engine: doing it from Python costs one FFI call
     per handle across a table of six figures, which is why the Python original
-    had to be given a PID set to stay tractable. ``pids=None`` searches every
-    process.
+    had to be given a PID set to stay tractable.
+
+    ``pids=None`` searches every process. An *empty* set matches nothing, and
+    the distinction matters: results from here feed
+    :func:`close_handle_in_process`, so treating an empty filter as "no
+    filter" would turn "restrict to these safe PIDs" into "every process on
+    the machine, including the critical ones the caller just excluded".
     """
     lib = _load()
     if lib is None:
         return None
+    if pids is not None and not pids:
+        return []
     pid_arr, pid_count = None, 0
     if pids:
         pid_list = sorted(pids)

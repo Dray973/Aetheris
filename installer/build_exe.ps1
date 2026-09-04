@@ -80,10 +80,10 @@ try {
     Write-Host "  ! agent DLL build skipped ($($_.Exception.Message))" -ForegroundColor Yellow
 }
 try {
-    Write-Step "Building native scan lib (Rust)"
+    Write-Step "Building native engines (Rust core + C++ Win32)"
     & (Join-Path $repo 'native\build.ps1')
 } catch {
-    Write-Host "  ! native scan lib skipped ($($_.Exception.Message))" -ForegroundColor Yellow
+    Write-Host "  ! native engines skipped ($($_.Exception.Message)) - the exe will fall back to pure Python" -ForegroundColor Yellow
 }
 
 # 2. Compile

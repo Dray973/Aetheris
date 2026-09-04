@@ -23,7 +23,7 @@ import threading
 from ctypes import wintypes
 from dataclasses import dataclass
 
-from ..core import logbus
+from ..core import dryrun, logbus
 from ..core import winapi as W
 from ..native import win as nativewin
 
@@ -179,7 +179,14 @@ def _handle_name(hproc, handle_value: int, timeout: float = 0.15) -> str | None:
 
 
 def find_file_handles(path: str, pids: set[int]) -> list[tuple[int, int]]:
-    """Return (pid, handle_value) for handles in ``pids`` naming ``path``."""
+    """Return (pid, handle_value) for handles in ``pids`` naming ``path``.
+
+    An empty ``pids`` matches nothing. Callers narrow this set to exclude
+    system-critical processes before the results are handed to the forced-close
+    path, so an empty filter must never widen into a system-wide search.
+    """
+    if not pids:
+        return []
     target = to_device_path(path)
     if target is None:
         return []
@@ -218,7 +225,17 @@ def find_file_handles(path: str, pids: set[int]) -> list[tuple[int, int]]:
 
 
 def close_handle_in_process(pid: int, handle_value: int) -> tuple[bool, str]:
-    """Force-close a handle inside another process via DUPLICATE_CLOSE_SOURCE."""
+    """
+    Force-close a handle inside another process via DUPLICATE_CLOSE_SOURCE.
+
+    Honours global dry-run. This is the most invasive operation in the module —
+    the target process loses a handle out from under itself, which can cost it
+    unsaved data — so it rehearses like every other destructive path (kill,
+    patch_memory, physical_write, autorun disable). The check lives on the
+    primitive rather than the orchestrator so no caller can route around it.
+    """
+    if dryrun.skip(SRC, f"force-close handle 0x{handle_value:x} in pid {pid}"):
+        return True, f"[dry-run] would close handle 0x{handle_value:x} in pid {pid}"
     native = nativewin.close_handle_in_process(pid, handle_value)
     if native is not None:
         if native:
