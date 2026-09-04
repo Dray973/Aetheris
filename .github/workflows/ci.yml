@@ -11,14 +11,14 @@ jobs:
     name: Native engines (Rust + C++)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # windows-latest ships rustup/cargo and the MSVC toolset, so no
       # third-party toolchain actions are pulled in. Only official actions are
       # used anywhere in this workflow — for a security tool the CI supply
       # chain is part of the threat model.
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -44,7 +44,7 @@ jobs:
       # Hand the built DLLs to the test job rather than rebuilding them per
       # Python version.
       - name: Upload engines
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: native-engines
           path: dist/*.dll
@@ -60,16 +60,16 @@ jobs:
         python-version: ['3.11', '3.12']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Download engines
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: native-engines
           path: dist
@@ -102,10 +102,10 @@ jobs:
     name: Lint (ruff + mypy --strict)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
