@@ -157,8 +157,17 @@ void extract_unicode(const BYTE* buf, ULONG buf_size, std::wstring& out) {
     if (!us->Buffer || us->Length == 0) return;
     // Buffer must point inside the buffer we supplied; anything else means a
     // layout we do not understand, and we would rather report nothing.
+    //
+    // The length check is written as a subtraction rather than `start +
+    // Length > end`: that form can wrap for a pointer near the top of the
+    // address space and pass a bounds check it should fail. Nothing observed
+    // produces such a pointer — the kernel fills this buffer — but this is the
+    // guard standing between a malformed reply and a wild read, so it should
+    // not have an arithmetic hole in it.
     const BYTE* start = (const BYTE*)us->Buffer;
-    if (start < buf || start + us->Length > buf + buf_size) return;
+    const BYTE* end = buf + buf_size;
+    if (start < buf || start >= end) return;
+    if ((size_t)us->Length > (size_t)(end - start)) return;
     out.assign(us->Buffer, us->Length / sizeof(wchar_t));
 }
 
