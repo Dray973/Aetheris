@@ -6,7 +6,7 @@ natural-language automation shell into one dashboard. It targets power users,
 security researchers, and systems administrators operating on machines they
 control.
 
-> **Status: v0.3.0.** A strictly decoupled architecture, a persistent
+> **Status: v0.3.1.** A strictly decoupled architecture, a persistent
 > tamper-evident (hash-chained) audit log, a global **dry-run** rehearsal mode,
 > and the Omega-Rollback safety shield back every module. The dozen modules are
 > reached from a single compact **dropdown navigator**. Recent additions: a
@@ -24,7 +24,7 @@ control.
 > no installer re-run required.
 > Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 370 tests. The hot paths run
+> pass `mypy --strict` + `ruff` and are covered by 392 tests. The hot paths run
 > in two in-tree native engines — **Rust** (`aetheris_core`: entropy, byte
 > search, PE parse/carve, NTFS MFT) and **C++** (`aetheris_win`: processes,
 > memory, the system-wide handle table, Authenticode, services/drivers, socket
@@ -90,7 +90,7 @@ native/            the two native engines + one build script for both:
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (370 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (392 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ### Native engines
@@ -188,7 +188,7 @@ additional features and degrade gracefully when absent (the UI tells you what's 
 
 ```powershell
 pip install .[test]
-pytest                                 # 370 tests over the cores
+pytest                                 # 392 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
