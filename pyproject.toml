@@ -136,3 +136,12 @@ ignore_errors = true
 # closure variable (the deliberate rollback-undo idiom here).
 module = ["aetheris.core.autoruns"]
 disable_error_code = ["misc"]
+
+[[tool.mypy.overrides]]
+# Recent numpy ships stubs that use the 3.12 `type` statement, which a
+# python_version = "3.10" check can't parse -- with the [recommended] extra
+# installed, mypy would abort before checking anything. numpy is only touched
+# by the (already ignore_errors) UI telemetry layer, so skip following it.
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
