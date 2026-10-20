@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -26,7 +27,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ... import __version__
+from ...analysis import export
 from ...analysis import findings as F
+from ...core import logbus
 from ..workers import Worker
 
 _SEV_COLOR = {"critical": "#ff5d6c", "high": "#ff9f43",
@@ -59,6 +63,12 @@ class FindingsTab(QWidget):
         self.yara_cb.setToolTip("Match built-in + user rules against suspect process memory "
                                 "(needs yara-python)")
         bar.addWidget(self.yara_cb)
+        self.export_btn = QPushButton("Export…")
+        self.export_btn.setToolTip("Save findings as SARIF 2.1.0 (GitHub code scanning, "
+                                   "VS Code SARIF viewer, SIEM import), JSON or Markdown")
+        self.export_btn.setEnabled(False)
+        self.export_btn.clicked.connect(self._export)
+        bar.addWidget(self.export_btn)
         bar.addStretch(1)
         self.summary = QLabel("", objectName="subtle")
         bar.addWidget(self.summary)
@@ -98,6 +108,7 @@ class FindingsTab(QWidget):
     def _populate(self, findings: list[F.Finding]) -> None:
         self.run_btn.setEnabled(True)
         self._findings = findings
+        self.export_btn.setEnabled(True)
         self.table.setRowCount(len(findings))
         counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
         for row, f in enumerate(findings):
@@ -135,3 +146,31 @@ class FindingsTab(QWidget):
             lines += ["", "Suggested responses (reversible, audited):"]
             lines += [f"  • {a}" for a in f.actions]
         self.detail.setPlainText("\n".join(lines))
+
+    _EXPORT_FILTERS = "SARIF 2.1.0 (*.sarif);;JSON (*.json);;Markdown (*.md)"
+
+    def _export(self) -> None:
+        path, chosen = QFileDialog.getSaveFileName(
+            self, "Export hunt findings", "hunt.sarif", self._EXPORT_FILTERS)
+        if not path:
+            return
+        try:
+            content = self._render_export(path, chosen)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(content)
+        except OSError as exc:
+            logbus.error("ui.findings", f"export failed: {exc}")
+            return
+        logbus.success("ui.findings", f"{len(self._findings)} finding(s) exported -> {path}")
+
+    def _render_export(self, path: str, chosen_filter: str = "") -> str:
+        """Pick the format from the extension, else from the chosen filter."""
+        import platform
+        low = path.lower()
+        if low.endswith(".json") or (not low.endswith((".sarif", ".md"))
+                                     and chosen_filter.startswith("JSON")):
+            return export.render_json(self._findings)
+        if low.endswith(".md") or (not low.endswith(".sarif")
+                                   and chosen_filter.startswith("Markdown")):
+            return export.render_markdown(self._findings)
+        return export.render_sarif(self._findings, __version__, platform.node())

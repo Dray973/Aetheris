@@ -72,3 +72,11 @@ def test_yara_detector_maps_match_to_finding():
 def test_clean_system_yields_nothing():
     procs = [_p(512, "svchost.exe", r"C:\Windows\System32\svchost.exe", "signed")]
     assert F.analyze(processes=procs) == []
+
+
+def test_correlation_key_is_the_basename_on_any_host():
+    # Regression: os.path.basename kept the whole Windows path off Windows,
+    # so the key (and SARIF fingerprint) differed between hosts.
+    from aetheris.analysis.findings import _key
+    assert _key(r"C:\Users\bob\AppData\Local\Temp\UPD.exe") == "upd.exe"
+    assert _key(None, "Fallback") == "fallback"

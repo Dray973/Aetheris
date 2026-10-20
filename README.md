@@ -24,7 +24,7 @@ control.
 > no installer re-run required.
 > Every write is confirm-gated, reversible via PANIC, audited,
 > and dry-run-aware; long/native work runs off the UI thread. The pure layers
-> pass `mypy --strict` + `ruff` and are covered by 392 tests. The hot paths run
+> pass `mypy --strict` + `ruff` and are covered by 449 tests. The hot paths run
 > in two in-tree native engines — **Rust** (`aetheris_core`: entropy, byte
 > search, PE parse/carve, NTFS MFT) and **C++** (`aetheris_win`: processes,
 > memory, the system-wide handle table, Authenticode, services/drivers, socket
@@ -90,7 +90,7 @@ native/            the two native engines + one build script for both:
 run.py             entry point + UAC elevation bootstrap + headless CLI dispatch
 pyproject.toml     packaging + `aetheris` / `aetheris-cli` entry points; ruff + mypy --strict
 installer/         one-click installer, bootstrap, Inno Setup, exe build + signing
-tests/             pytest suite (392 tests) for the cores + pytest-qt UI-thread tests
+tests/             pytest suite (449 tests) for the cores + pytest-qt UI-thread tests
 ```
 
 ### Native engines
@@ -188,7 +188,7 @@ additional features and degrade gracefully when absent (the UI tells you what's 
 
 ```powershell
 pip install .[test]
-pytest                                 # 392 tests over the cores
+pytest                                 # 449 tests over the cores
 ```
 
 The suite (`tests/`) regression-guards the deterministic cores: Auto-Shell
@@ -304,7 +304,16 @@ The suite does **not** include a credential-extraction path against
   aetheris-cli connections --format csv --out conns.csv
   aetheris-cli run public-connections
   aetheris-cli report --out s.html --interval 300 --count 12   # scheduled capture
+  aetheris-cli --format sarif --out hunt.sarif hunt             # threat hunt -> SARIF
   ```
+
+- **Threat-hunt export (SARIF 2.1.0)** — the Threat Hunt tab's **Export…** and
+  `aetheris-cli hunt` write findings as SARIF (validated against the official
+  OASIS schema in the test suite), JSON, CSV, Markdown or HTML. SARIF opens in
+  the VS Code SARIF viewer, uploads to GitHub code scanning, and imports into
+  most SIEMs: each ATT&CK technique becomes a rule linked to its MITRE page,
+  severity maps to `level` + `security-severity`, and the correlation key is a
+  stable fingerprint so the same binary is recognised across runs and machines.
 
 - **Registry diff viewer** — the Shell tab shows a color-coded, filterable
   Added/Modified/Removed table (not just Markdown), can save/load snapshots as
@@ -381,8 +390,12 @@ python -m py_compile (Get-ChildItem -Recurse -Filter *.py aetheris | % FullName)
 python -c "import aetheris.core.nlshell_smoke" 2>$null   # see tools below
 ```
 
-Non-Windows machines can import and unit-test the pure-Python layers (nlshell,
-dedupe, registry diff logic); Win32-specific calls guard on `sys.platform`.
+Non-Windows machines run the full suite: the pure layers (parsers, findings +
+SARIF export, registry diff, nlshell, dedupe), the Qt UI-thread tests (native
+calls monkeypatched), and the Python side of the C++ bindings against a fake
+engine (`tests/test_native_win_logic.py`). Tests that need a live Win32 API or
+the built DLLs skip. CI runs this on Ubuntu alongside the Windows jobs, so a
+change made from a Linux or cloud session can be verified before it lands.
 
 ## Contributors
 
