@@ -4,18 +4,14 @@ not block the event loop.
 Each test monkeypatches the native call to an Event-gated blocker, fires the
 slot, and asserts (a) the slot returns while the native call is still blocked,
 (b) the native call ran on a *worker* thread (not the GUI thread), and (c) the
-result is delivered via the Worker's ``done`` signal. Windows-only because the
-tabs import the native (ctypes) layers at construction.
+result is delivered via the Worker's ``done`` signal. The native calls are all
+monkeypatched, and every tab constructs without its native engine, so these run
+on any platform (including the Linux CI job).
 """
 import os
-import sys
 import threading
 
-import pytest
-
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="native tabs are Windows-only")
 
 
 def _assert_offloaded(qtbot, tab, fire, patch_target, attr, monkeypatch, result):
@@ -76,8 +72,9 @@ def test_disable_diagtrack_offloaded(qtbot, monkeypatch):
     from aetheris.core import registry
     from aetheris.ui.tabs.shell_tab import ShellTab
 
-    tab = ShellTab()
-    qtbot.addWidget(tab)
+    shell = ShellTab()
+    qtbot.addWidget(shell)
+    tab = shell.privacy
     monkeypatch.setattr(QMessageBox, "question",
                         lambda *a, **k: QMessageBox.StandardButton.Yes)
 
@@ -109,8 +106,9 @@ def test_service_control_offloaded(qtbot, monkeypatch):
     from aetheris.core.services import ServiceInfo
     from aetheris.ui.tabs.shell_tab import ShellTab
 
-    tab = ShellTab()
-    qtbot.addWidget(tab)
+    shell = ShellTab()
+    qtbot.addWidget(shell)
+    tab = shell.services
     tab._services = [ServiceInfo("Spooler", "Print Spooler", "", "", "auto", "service")]
     tab._apply_svc_filter()
     tab.svc_table.selectRow(0)
@@ -128,8 +126,9 @@ def test_task_control_offloaded(qtbot, monkeypatch):
     from aetheris.core.taskaudit import TaskInfo
     from aetheris.ui.tabs.shell_tab import ShellTab
 
-    tab = ShellTab()
-    qtbot.addWidget(tab)
+    shell = ShellTab()
+    qtbot.addWidget(shell)
+    tab = shell.tasks
     tab._tasks = [TaskInfo(r"\Evil", "Evil", "", "", True, False,
                            ["logon"], ["x.exe"], ["x.exe"])]
     tab._apply_task_filter()
@@ -148,8 +147,9 @@ def test_persistence_control_offloaded(qtbot, monkeypatch):
     from aetheris.core.persistence import PersistenceEntry
     from aetheris.ui.tabs.shell_tab import ShellTab
 
-    tab = ShellTab()
-    qtbot.addWidget(tab)
+    shell = ShellTab()
+    qtbot.addWidget(shell)
+    tab = shell.persistence
     tab._pm = [PersistenceEntry("Service", "Spooler", "svc", "Service (auto)", ref="Spooler")]
     tab._apply_pm_filter()
     tab.pm_table.selectRow(0)
