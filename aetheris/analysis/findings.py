@@ -230,6 +230,89 @@ def detect_yara(matches: Iterable[Any], pid_to_exe: dict[int, str] | None = None
     return out
 
 
+def detect_credential_access(handles: Iterable[Any],
+                             processes: Iterable[Any] = ()) -> list[Finding]:
+    """Handles into lsass.exe that can read or write its memory (T1003.001).
+
+    ``handles`` are ``forensics.credaccess.LsassHandle``-shaped. Windows and
+    security components that do this by design are skipped by image path, so
+    a look-alike name in the wrong folder still fires.
+    """
+    from ..forensics import credaccess
+    sig = {getattr(p, "pid", 0): getattr(p, "signature", "") for p in processes}
+    by_holder: dict[int, list[Any]] = defaultdict(list)
+    for h in handles:
+        by_holder[getattr(h, "holder_pid", 0)].append(h)
+    out: list[Finding] = []
+    for pid, hs in by_holder.items():
+        first = hs[0]
+        exe = getattr(first, "holder_exe", "") or ""
+        signature = sig.get(pid, "")
+        if credaccess.is_expected(exe, signature):
+            continue
+        access = 0
+        for h in hs:
+            access |= int(getattr(h, "granted_access", 0))
+        reads = bool(access & credaccess.PROCESS_VM_READ)
+        unsigned = signature == "unsigned"
+        score = (90 if unsigned else 70) if reads else (60 if unsigned else 45)
+        rights = [n for bit, n in ((credaccess.PROCESS_VM_READ, "VM_READ"),
+                                   (credaccess.PROCESS_VM_WRITE, "VM_WRITE"),
+                                   (credaccess.PROCESS_VM_OPERATION, "VM_OPERATION"),
+                                   (credaccess.PROCESS_CREATE_THREAD, "CREATE_THREAD"))
+                  if access & bit]
+        name = getattr(first, "holder_name", "?")
+        out.append(Finding(
+            key=_key(exe, name),
+            subject=f"{name} (pid {pid})",
+            title=("Process can read LSASS memory (credential dumping)" if reads
+                   else "Process holds a write-class handle to LSASS"),
+            score=score, category="credential-access",
+            technique="T1003.001", technique_name="OS Credential Dumping: LSASS Memory",
+            evidence=[f"handle(s) into lsass.exe (pid {getattr(first, 'lsass_pid', 0)}): "
+                      f"{len(hs)}",
+                      f"granted access: 0x{access:08x} ({', '.join(rights) or 'other'})",
+                      f"exe: {exe or '?'}",
+                      f"Authenticode: {signature or '?'}"],
+            actions=[f"suspend pid {pid}", f"kill pid {pid}"]))
+    return out
+
+
+def detect_downloads(processes: Iterable[Any],
+                     origins: dict[str, Any] | None = None) -> list[Finding]:
+    """Running images that carry an internet Mark-of-the-Web (T1204.002).
+
+    Alone this is weak -- people run installers -- so it scores low and
+    exists mainly to correlate: an unsigned temp binary that was also just
+    downloaded, then persists, reads as one story.
+    """
+    origins = origins or {}
+    out: list[Finding] = []
+    seen: set[str] = set()
+    for p in processes:
+        exe = getattr(p, "exe", "") or ""
+        origin = origins.get(exe.lower())
+        if origin is None or not getattr(origin, "from_internet", False):
+            continue
+        if exe.lower() in seen:
+            continue
+        seen.add(exe.lower())
+        unsigned = getattr(p, "signature", "") == "unsigned"
+        evidence = [f"exe: {exe}", f"origin: {origin.describe()}"]
+        if getattr(origin, "host", ""):
+            evidence.append(f"download host: {origin.host}")
+        out.append(Finding(
+            key=_key(exe, getattr(p, "name", "")),
+            subject=f"{getattr(p, 'name', '?')} (pid {getattr(p, 'pid', 0)})",
+            title="Running a file downloaded from the internet"
+                  + (" (unsigned)" if unsigned else ""),
+            score=30 if unsigned else 10, category="execution",
+            technique="T1204.002", technique_name="User Execution: Malicious File",
+            evidence=evidence,
+            actions=[f"suspend pid {getattr(p, 'pid', 0)}"]))
+    return out
+
+
 # --- correlation + entry points --------------------------------------------
 def correlate(findings: list[Finding]) -> list[Finding]:
     """Merge findings that share a key into one boosted finding; sort by score."""
@@ -267,7 +350,9 @@ def analyze(processes: Iterable[Any] = (), connections: Iterable[Any] = (),
             persistence: Iterable[Any] = (), tasks: Iterable[Any] = (),
             services: Iterable[Any] = (), injections: Iterable[Any] = (),
             yara_matches: Iterable[Any] = (),
-            pid_to_exe: dict[int, str] | None = None) -> list[Finding]:
+            pid_to_exe: dict[int, str] | None = None,
+            lsass_handles: Iterable[Any] = (),
+            origins: dict[str, Any] | None = None) -> list[Finding]:
     """Run every detector over the supplied data and return ranked, correlated
     findings. All inputs optional so each detector is testable in isolation."""
     processes = list(processes)
@@ -279,12 +364,51 @@ def analyze(processes: Iterable[Any] = (), connections: Iterable[Any] = (),
     signals += detect_services(services)
     signals += detect_injection(injections, pid_to_exe)
     signals += detect_yara(yara_matches, pid_to_exe)
+    signals += detect_credential_access(lsass_handles, processes)
+    signals += detect_downloads(processes, origins)
     return correlate(signals)
+
+
+def collect_origins(processes: Iterable[Any],
+                    read: Any) -> dict[str, Any]:
+    """Mark-of-the-Web for each distinct non-system image (lower-cased path)."""
+    out: dict[str, Any] = {}
+    for p in processes:
+        exe = (getattr(p, "exe", "") or "").lower()
+        if not exe or exe in out or exe.startswith("c:\\windows\\"):
+            continue
+        try:
+            origin = read(getattr(p, "exe", ""))
+        except Exception:  # noqa: BLE001
+            origin = None
+        if origin is not None:
+            out[exe] = origin
+    return out
+
+
+@dataclass
+class HuntResult:
+    """A hunt's findings plus the raw data they came from, so follow-up
+    actions (containment, the analyst) act on the same evidence."""
+    findings: list[Finding] = field(default_factory=list)
+    processes: list[Any] = field(default_factory=list)
+    connections: list[Any] = field(default_factory=list)
+    persistence: list[Any] = field(default_factory=list)
+    origins: dict[str, Any] = field(default_factory=dict)
+    ts: float = 0.0
 
 
 def gather(scan_injection: bool = True, scan_yara: bool = False,
            max_scans: int = 40) -> list[Finding]:
     """Collect live data and analyze it (impure; run on a Worker)."""
+    return gather_context(scan_injection, scan_yara, max_scans).findings
+
+
+def gather_context(scan_injection: bool = True, scan_yara: bool = False,
+                   max_scans: int = 40) -> HuntResult:
+    """Like :func:`gather` but also returns the data behind the findings."""
+    import time
+
     from ..core import logbus, taskaudit
     from ..core import persistence as persist_mod
     from ..core import services as services_mod
@@ -330,9 +454,18 @@ def gather(scan_injection: bool = True, scan_yara: bool = False,
             except Exception:  # noqa: BLE001
                 continue
 
+    from ..forensics import credaccess, motw
+    try:
+        lsass_handles = credaccess.collect(procs) or []
+    except Exception:  # noqa: BLE001
+        lsass_handles = []
+    origins = collect_origins(procs, motw.read)
+
     findings = analyze(processes=procs, connections=conns, persistence=pmap,
                        tasks=tasks, services=svcs, injections=injections,
-                       yara_matches=yara_matches, pid_to_exe=pid_to_exe)
+                       yara_matches=yara_matches, pid_to_exe=pid_to_exe,
+                       lsass_handles=lsass_handles, origins=origins)
     logbus.trace(SRC, f"hunt: {len(findings)} finding(s) from "
                       f"{len(procs)} proc / {len(conns)} conn")
-    return findings
+    return HuntResult(findings=findings, processes=procs, connections=conns,
+                      persistence=pmap, origins=origins, ts=time.time())

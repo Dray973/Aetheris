@@ -20,9 +20,10 @@ import os
 import subprocess
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from ctypes import wintypes
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import logbus
 from . import winapi as W
@@ -35,23 +36,113 @@ class RollbackEntry:
     label: str
     undo: Callable[[], None]
     ts: float
+    id: int = 0
+    #: For a transaction group: its member actions, in the order they ran.
+    children: list[RollbackEntry] = field(default_factory=list)
+
+    def run(self) -> list[tuple[str, bool, str]]:
+        """Undo this entry (a group: its members in reverse). Never raises."""
+        if self.children:
+            out: list[tuple[str, bool, str]] = []
+            for child in reversed(self.children):
+                out += child.run()
+            return out
+        try:
+            self.undo()
+        except Exception as exc:  # noqa: BLE001
+            logbus.error(SRC, f"rollback FAILED: {self.label}", str(exc))
+            return [(self.label, False, str(exc))]
+        logbus.success(SRC, f"reverted: {self.label}")
+        return [(self.label, True, "reverted")]
+
+
+def _noop() -> None:
+    return None
 
 
 class RollbackLedger:
-    """LIFO stack of undoable actions for this session."""
+    """LIFO stack of undoable actions for this session.
+
+    Actions registered inside :meth:`group` are collected into one entry, so a
+    multi-step operation (a containment: suspend + isolate + disable +
+    quarantine) can be undone as a unit with :meth:`undo` while PANIC still
+    reverts everything.
+    """
 
     def __init__(self) -> None:
         self._entries: list[RollbackEntry] = []
         self._lock = threading.Lock()
+        self._next_id = 1
+        # Groups are per-thread: a containment runs on its own Worker, and an
+        # unrelated action on another thread must not be swept into it.
+        self._local = threading.local()
 
-    def register(self, label: str, undo: Callable[[], None]) -> None:
+    def _new_id(self) -> int:
         with self._lock:
-            self._entries.append(RollbackEntry(label, undo, time.time()))
+            n = self._next_id
+            self._next_id += 1
+            return n
+
+    def register(self, label: str, undo: Callable[[], None]) -> int:
+        entry = RollbackEntry(label, undo, time.time(), self._new_id())
+        stack: list[list[RollbackEntry]] = getattr(self._local, "groups", [])
+        if stack:
+            stack[-1].append(entry)
+        else:
+            with self._lock:
+                self._entries.append(entry)
         logbus.trace(SRC, f"rollback registered: {label}")
+        return entry.id
+
+    @contextmanager
+    def group(self, label: str) -> Iterator[GroupHandle]:
+        """Collect every undo registered in this block into one entry.
+
+        The group is pushed even if the block raises: whatever was done before
+        the failure must stay undoable. An empty group leaves no entry.
+        """
+        stack = getattr(self._local, "groups", None)
+        if stack is None:
+            stack = self._local.groups = []
+        members: list[RollbackEntry] = []
+        stack.append(members)
+        handle = GroupHandle(label=label)
+        try:
+            yield handle
+        finally:
+            stack.pop()
+            if members:
+                entry = RollbackEntry(label, _noop, time.time(), self._new_id(),
+                                      children=members)
+                handle.id = entry.id
+                handle.members = [m.label for m in members]
+                if stack:                      # nested group: fold into the outer one
+                    stack[-1].append(entry)
+                else:
+                    with self._lock:
+                        self._entries.append(entry)
+                logbus.trace(SRC, f"rollback group registered: {label} "
+                                  f"({len(members)} action(s))")
 
     def pending(self) -> list[str]:
         with self._lock:
             return [e.label for e in self._entries]
+
+    def has(self, entry_id: int) -> bool:
+        with self._lock:
+            return any(e.id == entry_id for e in self._entries)
+
+    def undo(self, entry_id: int) -> list[tuple[str, bool, str]]:
+        """Undo one entry (or group) by id and drop it from the ledger."""
+        with self._lock:
+            for i, e in enumerate(self._entries):
+                if e.id == entry_id:
+                    del self._entries[i]
+                    break
+            else:
+                return [(f"#{entry_id}", False, "nothing to undo (already reverted?)")]
+        logbus.action(SRC, f"undo: {e.label}")
+        return e.run()
 
     def panic(self) -> list[tuple[str, bool, str]]:
         """Run every registered undo in reverse. Returns per-entry results."""
@@ -61,14 +152,16 @@ class RollbackLedger:
         logbus.action(SRC, f"PANIC: rolling back {len(entries)} action(s)")
         results: list[tuple[str, bool, str]] = []
         for e in entries:
-            try:
-                e.undo()
-                results.append((e.label, True, "reverted"))
-                logbus.success(SRC, f"reverted: {e.label}")
-            except Exception as exc:  # noqa: BLE001
-                results.append((e.label, False, str(exc)))
-                logbus.error(SRC, f"rollback FAILED: {e.label}", str(exc))
+            results += e.run()
         return results
+
+
+@dataclass
+class GroupHandle:
+    """Filled in when a :meth:`RollbackLedger.group` block closes."""
+    label: str
+    id: int = 0
+    members: list[str] = field(default_factory=list)
 
 
 ledger = RollbackLedger()

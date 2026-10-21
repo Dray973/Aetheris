@@ -80,3 +80,10 @@ def test_correlation_key_is_the_basename_on_any_host():
     from aetheris.analysis.findings import _key
     assert _key(r"C:\Users\bob\AppData\Local\Temp\UPD.exe") == "upd.exe"
     assert _key(None, "Fallback") == "fallback"
+
+
+def test_gather_wraps_gather_context(monkeypatch):
+    from aetheris.analysis import findings as F
+    res = F.HuntResult(findings=[], processes=[1], ts=5.0)
+    monkeypatch.setattr(F, "gather_context", lambda *a, **k: res)
+    assert F.gather() == [] and res.processes == [1]
