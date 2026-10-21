@@ -121,6 +121,9 @@ def test_health_tab_populates(qtbot):
 
     tab = HealthTab()
     qtbot.addWidget(tab)
+    # The tab auto-refreshes on open; let that worker finish before we drive it.
+    qtbot.waitUntil(lambda: tab._worker is None or not tab._worker.isRunning(),
+                    timeout=5000)
     report = health.HealthReport(metrics=[
         health.Metric("disk:C:", "Disk C:", health.CRITICAL, "96% used, 1.0 GB free",
                       recommendation="Free up space now."),

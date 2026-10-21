@@ -7,6 +7,7 @@ Read-only: this tab never changes the machine.
 """
 from __future__ import annotations
 
+import shiboken6
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -61,9 +62,18 @@ class HealthTab(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         root.addWidget(self.table, 1)
 
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # Never let a running collect() QThread outlive the widget (that aborts
+        # the process); wait for it to finish first.
+        if self._worker is not None:
+            self._worker.wait()
+        super().closeEvent(event)
+
     def _refresh(self) -> None:
         if self._worker is not None and self._worker.isRunning():
             return
+        if self._worker is not None:
+            self._worker.wait()
         self.refresh_btn.setEnabled(False)
         self.summary.setText("checking…")
         self._worker = Worker(health.collect)
@@ -72,10 +82,14 @@ class HealthTab(QWidget):
         self._worker.start()
 
     def _on_failed(self, err: str) -> None:
+        if not shiboken6.isValid(self):
+            return
         self.refresh_btn.setEnabled(True)
         self.summary.setText(f"health check failed: {err}")
 
     def _populate(self, report: health.HealthReport) -> None:
+        if not shiboken6.isValid(self):
+            return
         self.refresh_btn.setEnabled(True)
         metrics = report.worst_first()
         self.score_label.setText(f"{report.score}/100")
