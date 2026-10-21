@@ -26,23 +26,52 @@ from pathlib import Path
 from .core import plugins, report
 
 
-def _hunt(fmt: str, scan_injection: bool, scan_yara: bool) -> tuple[str, str]:
-    """Run the threat hunt and render it. SARIF is the default machine format."""
+def _hunt(fmt: str, scan_injection: bool, scan_yara: bool,
+          baseline_path: str | None = None, new_only: bool = False,
+          save_baseline: str | None = None) -> tuple[str, str]:
+    """Run the threat hunt and render it. SARIF is the default machine format.
+
+    ``baseline_path`` ("default" = the one saved from the GUI) tags every
+    finding new / escalated / known; ``new_only`` then drops the known ones.
+    ``save_baseline`` writes this hunt as the new known-good state.
+    """
     import platform
 
     from . import __version__
+    from .analysis import baseline as bl
     from .analysis import export, findings
 
     found = findings.gather(scan_injection=scan_injection, scan_yara=scan_yara)
+    host = platform.node()
+
+    base: bl.Baseline | None = None
+    if baseline_path:
+        path = bl.default_path() if baseline_path == "default" else baseline_path
+        try:
+            base = bl.load(path)
+        except (OSError, ValueError, KeyError) as exc:
+            raise ValueError(f"cannot read baseline {path}: {exc}") from exc
+    elif new_only:
+        raise ValueError("--new-only needs --baseline")
+    if base is not None and new_only:
+        found = [f for f in found if base.status(f) != bl.KNOWN]
+    if save_baseline:
+        target = bl.default_path() if save_baseline == "default" else save_baseline
+        bl.Baseline.from_findings(found, host=host).save(target)
+        print(f"baseline saved: {target} ({len(found)} finding(s) accepted)",
+              file=sys.stderr)
+
     if fmt == "sarif":
-        return export.render_sarif(found, __version__, platform.node()), "sarif"
+        return export.render_sarif(found, __version__, host, base), "sarif"
     if fmt == "json":
-        return export.render_json(found), "json"
+        return export.render_json(found, base), "json"
     if fmt == "csv":
-        rows = export.to_rows(found)
+        rows = export.to_rows(found, base)
         headers = ["severity", "score", "category", "technique", "subject", "title"]
+        if base is not None:
+            headers.append("baseline")
         return report.rows_to_csv(headers, [[r[h] for h in headers] for r in rows]), "csv"
-    md = export.render_markdown(found)
+    md = export.render_markdown(found, baseline=base)
     if fmt == "md":
         return md, "md"
     return report.html_document("Threat Hunt", [("Findings", "pre", md)]), "html"
@@ -136,6 +165,13 @@ def main(argv: list[str] | None = None) -> int:
                        help="skip the memory-injection scan (faster)")
     huntp.add_argument("--yara", action="store_true",
                        help="also scan suspect processes with YARA rules")
+    huntp.add_argument("--baseline", metavar="PATH",
+                       help="compare against a saved baseline ('default' = the "
+                            "GUI's); tags findings new/escalated/known")
+    huntp.add_argument("--new-only", action="store_true",
+                       help="with --baseline, drop findings already accepted")
+    huntp.add_argument("--save-baseline", metavar="PATH",
+                       help="accept this hunt as known-good ('default' = the GUI's)")
 
     args = ap.parse_args(argv)
 
@@ -149,7 +185,12 @@ def main(argv: list[str] | None = None) -> int:
 
     def one_capture(index: int) -> None:
         if args.command == "hunt":
-            content, _ext = _hunt(args.format, not args.no_injection, args.yara)
+            try:
+                content, _ext = _hunt(args.format, not args.no_injection, args.yara,
+                                      args.baseline, args.new_only, args.save_baseline)
+            except ValueError as exc:
+                print(f"aetheris-cli: {exc}", file=sys.stderr)
+                raise SystemExit(2) from exc
             _emit(content, args.out, index, count)
         elif args.command == "run":
             ok, content = plugins.run_plugin(args.plugin)

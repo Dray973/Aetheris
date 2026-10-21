@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, Protocol
 
 from .findings import Finding
 
@@ -34,6 +34,15 @@ SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 SARIF_VERSION = "2.1.0"
 TOOL_NAME = "Aetheris Quantum Core"
 TOOL_URI = "https://github.com/Dray973/Aetheris"
+
+class _Baseline(Protocol):
+    """What the exporters need from analysis.baseline.Baseline (kept as a
+    protocol so this module doesn't import it -- baseline imports us)."""
+    def status(self, f: Finding) -> str: ...
+
+
+#: baseline status -> SARIF result.baselineState
+_BASELINE_STATE = {"new": "new", "escalated": "updated", "known": "unchanged"}
 
 _LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note"}
 _TECHNIQUE_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
@@ -134,8 +143,13 @@ def _result(f: Finding, rule_index: int) -> dict[str, Any]:
 
 
 def to_sarif(findings: Iterable[Finding], tool_version: str = "",
-             host: str = "") -> dict[str, Any]:
-    """Build a SARIF 2.1.0 log (as a dict) for one hunt."""
+             host: str = "", baseline: _Baseline | None = None) -> dict[str, Any]:
+    """Build a SARIF 2.1.0 log (as a dict) for one hunt.
+
+    With a ``baseline``, every result carries SARIF's own ``baselineState``
+    (new / updated / unchanged), which viewers and GitHub use to separate
+    fresh alerts from accepted ones.
+    """
     findings = list(findings)
     rules: list[dict[str, Any]] = []
     index: dict[str, int] = {}
@@ -145,7 +159,10 @@ def to_sarif(findings: Iterable[Finding], tool_version: str = "",
         if rid not in index:
             index[rid] = len(rules)
             rules.append(_rule(f))
-        results.append(_result(f, index[rid]))
+        res = _result(f, index[rid])
+        if baseline is not None:
+            res["baselineState"] = _BASELINE_STATE[baseline.status(f)]
+        results.append(res)
     driver: dict[str, Any] = {"name": TOOL_NAME, "informationUri": TOOL_URI,
                               "rules": rules}
     if tool_version:
@@ -157,42 +174,58 @@ def to_sarif(findings: Iterable[Finding], tool_version: str = "",
 
 
 def render_sarif(findings: Iterable[Finding], tool_version: str = "",
-                 host: str = "") -> str:
-    return json.dumps(to_sarif(findings, tool_version, host), indent=2)
+                 host: str = "", baseline: _Baseline | None = None) -> str:
+    return json.dumps(to_sarif(findings, tool_version, host, baseline), indent=2)
 
 
-def to_rows(findings: Iterable[Finding]) -> list[dict[str, Any]]:
+def to_rows(findings: Iterable[Finding],
+            baseline: _Baseline | None = None) -> list[dict[str, Any]]:
     """Plain dicts, one per finding -- for JSON export."""
-    return [{
-        "severity": f.severity, "score": f.score, "category": f.category,
-        "technique": f.technique, "technique_name": f.technique_name,
-        "techniques": techniques_of(f), "subject": f.subject, "title": f.title,
-        "key": f.key, "evidence": list(f.evidence), "actions": list(f.actions),
-    } for f in findings]
+    rows = []
+    for f in findings:
+        row: dict[str, Any] = {
+            "severity": f.severity, "score": f.score, "category": f.category,
+            "technique": f.technique, "technique_name": f.technique_name,
+            "techniques": techniques_of(f), "subject": f.subject, "title": f.title,
+            "key": f.key, "evidence": list(f.evidence), "actions": list(f.actions),
+        }
+        if baseline is not None:
+            row["baseline"] = baseline.status(f)
+        rows.append(row)
+    return rows
 
 
-def render_json(findings: Iterable[Finding]) -> str:
-    return json.dumps(to_rows(findings), indent=2)
+def render_json(findings: Iterable[Finding],
+                baseline: _Baseline | None = None) -> str:
+    return json.dumps(to_rows(findings, baseline), indent=2)
 
 
 def _md_cell(s: str) -> str:
     return s.replace("|", "\\|").replace("\n", " ")
 
 
-def render_markdown(findings: Sequence[Finding], title: str = "Threat Hunt") -> str:
+def render_markdown(findings: Sequence[Finding], title: str = "Threat Hunt",
+                    baseline: _Baseline | None = None) -> str:
     counts = {s: sum(1 for f in findings if f.severity == s)
               for s in ("critical", "high", "medium", "low")}
     out = [f"# {title}", "",
            f"{len(findings)} finding(s): " + ", ".join(f"{n} {s}" for s, n in counts.items()),
            ""]
+    if baseline is not None:
+        states = [baseline.status(f) for f in findings]
+        out += ["Against baseline: " + ", ".join(
+            f"{states.count(k)} {k}" for k in ("new", "escalated", "known")), ""]
     if not findings:
         out.append("No findings -- nothing correlated as suspicious.")
         return "\n".join(out) + "\n"
-    out += ["| Severity | Score | ATT&CK | Subject | Finding |",
-            "|---|---:|---|---|---|"]
+    status_col = baseline is not None
+    out += ["| Severity | Score | ATT&CK | Subject | Finding |"
+            + (" Baseline |" if status_col else ""),
+            "|---|---:|---|---|---|" + ("---|" if status_col else "")]
     for f in findings:
         out.append(f"| {f.severity.upper()} | {f.score} | {', '.join(techniques_of(f))} "
-                   f"| {_md_cell(f.subject)} | {_md_cell(f.title)} |")
+                   f"| {_md_cell(f.subject)} | {_md_cell(f.title)} |"
+                   + (f" {baseline.status(f)} |" if baseline is not None else ""))
     for i, f in enumerate(findings, 1):
         out += ["", f"## {i}. {f.title}", "",
                 f"- **Subject:** {f.subject}",

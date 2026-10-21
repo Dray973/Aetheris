@@ -12,6 +12,8 @@ the suite, and *which* test fails changes run to run. That is a genuinely
 confusing failure to debug, so it is removed at the source rather than worked
 around in the affected tests.
 """
+import os
+
 import pytest
 
 from aetheris.native import win
@@ -32,3 +34,23 @@ def _reset_native_engine_state():
     yield
     if win.available():
         win.reset_cache()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_config_dir(tmp_path):
+    """Point %APPDATA% (core.settings.config_dir) at a per-test folder, so no
+    test reads or writes the real user's settings, baseline or history.
+
+    Deliberately not built on ``monkeypatch``: requesting it here would set it
+    up before the engine-reset fixture above, so its undo would run *after*
+    that fixture's teardown -- while a test's fake engine is still installed.
+    """
+    old = os.environ.get("APPDATA")
+    os.environ["APPDATA"] = str(tmp_path / "appdata")
+    try:
+        yield
+    finally:
+        if old is None:
+            os.environ.pop("APPDATA", None)
+        else:
+            os.environ["APPDATA"] = old
