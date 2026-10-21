@@ -386,9 +386,29 @@ def collect_origins(processes: Iterable[Any],
     return out
 
 
+@dataclass
+class HuntResult:
+    """A hunt's findings plus the raw data they came from, so follow-up
+    actions (containment, the analyst) act on the same evidence."""
+    findings: list[Finding] = field(default_factory=list)
+    processes: list[Any] = field(default_factory=list)
+    connections: list[Any] = field(default_factory=list)
+    persistence: list[Any] = field(default_factory=list)
+    origins: dict[str, Any] = field(default_factory=dict)
+    ts: float = 0.0
+
+
 def gather(scan_injection: bool = True, scan_yara: bool = False,
            max_scans: int = 40) -> list[Finding]:
     """Collect live data and analyze it (impure; run on a Worker)."""
+    return gather_context(scan_injection, scan_yara, max_scans).findings
+
+
+def gather_context(scan_injection: bool = True, scan_yara: bool = False,
+                   max_scans: int = 40) -> HuntResult:
+    """Like :func:`gather` but also returns the data behind the findings."""
+    import time
+
     from ..core import logbus, taskaudit
     from ..core import persistence as persist_mod
     from ..core import services as services_mod
@@ -447,4 +467,5 @@ def gather(scan_injection: bool = True, scan_yara: bool = False,
                        lsass_handles=lsass_handles, origins=origins)
     logbus.trace(SRC, f"hunt: {len(findings)} finding(s) from "
                       f"{len(procs)} proc / {len(conns)} conn")
-    return findings
+    return HuntResult(findings=findings, processes=procs, connections=conns,
+                      persistence=pmap, origins=origins, ts=time.time())
