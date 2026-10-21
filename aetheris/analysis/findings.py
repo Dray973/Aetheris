@@ -16,7 +16,7 @@ high-severity finding instead of four scattered rows.
 """
 from __future__ import annotations
 
-import os
+import ntpath
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -65,8 +65,10 @@ def _in_suspicious_dir(path: str | None) -> bool:
 
 
 def _key(path: str | None, fallback: str = "") -> str:
+    # Paths here are always Windows paths: ntpath splits on "\\" on any host,
+    # so offline analysis correlates exactly as it does on the live machine.
     if path:
-        return os.path.basename(path).lower() or path.lower()
+        return ntpath.basename(path).lower() or path.lower()
     return (fallback or "?").lower()
 
 

@@ -15,6 +15,7 @@ carry no OS dependency and are unit-tested off-Windows. Reversible control
 from __future__ import annotations
 
 import ctypes
+import ntpath
 import os
 import re
 import sys
@@ -77,12 +78,14 @@ def resolve_path(binary: str) -> str:
     low = b.lower()
     root = os.environ.get("SystemRoot", r"C:\Windows")
     if low.startswith("\\systemroot\\"):
-        b = os.path.join(root, b[len("\\systemroot\\"):])
+        b = ntpath.join(root, b[len("\\systemroot\\"):])
     elif low.startswith("\\??\\"):
         b = b[4:]
     elif low.startswith("system32\\") or low.startswith("systemroot\\"):
-        b = os.path.join(root, b)
-    return os.path.expandvars(b)
+        b = ntpath.join(root, b)
+    # Service paths are always Windows paths: use ntpath so the result is the
+    # same on any host (cloud analysis, Linux CI) instead of mixing separators.
+    return ntpath.expandvars(b)
 
 
 def start_type_label(value: int) -> str:

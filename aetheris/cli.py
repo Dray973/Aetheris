@@ -7,6 +7,7 @@ Aetheris headless CLI — dump forensic reports without the GUI.
     aetheris-cli connections --format json
     aetheris-cli plugins
     aetheris-cli run top-memory --out top.txt
+    aetheris-cli hunt --format sarif --out hunt.sarif
 
 Scheduled capture: repeat any command on an interval, writing timestamped files.
 
@@ -25,10 +26,35 @@ from pathlib import Path
 from .core import plugins, report
 
 
+def _hunt(fmt: str, scan_injection: bool, scan_yara: bool) -> tuple[str, str]:
+    """Run the threat hunt and render it. SARIF is the default machine format."""
+    import platform
+
+    from . import __version__
+    from .analysis import export, findings
+
+    found = findings.gather(scan_injection=scan_injection, scan_yara=scan_yara)
+    if fmt == "sarif":
+        return export.render_sarif(found, __version__, platform.node()), "sarif"
+    if fmt == "json":
+        return export.render_json(found), "json"
+    if fmt == "csv":
+        rows = export.to_rows(found)
+        headers = ["severity", "score", "category", "technique", "subject", "title"]
+        return report.rows_to_csv(headers, [[r[h] for h in headers] for r in rows]), "csv"
+    md = export.render_markdown(found)
+    if fmt == "md":
+        return md, "md"
+    return report.html_document("Threat Hunt", [("Findings", "pre", md)]), "html"
+
+
 def _gen(cmd: str, fmt: str) -> tuple[str, str]:
     """Return (content, default_extension) for a command + format."""
     from .forensics import processes
     from .network import connections
+
+    if fmt == "sarif":
+        raise ValueError("--format sarif applies to the hunt command")
 
     if cmd == "report":
         procs = processes.snapshot(sign=True)
@@ -90,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="aetheris-cli",
                                  description="Aetheris headless forensic capture")
     ap.add_argument("--format", "-f", default="html",
-                    choices=["html", "md", "csv", "json"])
+                    choices=["html", "md", "csv", "json", "sarif"])
     ap.add_argument("--out", "-o", help="output file (stdout if omitted)")
     ap.add_argument("--interval", type=float, default=0,
                     help="seconds between repeats (scheduled capture)")
@@ -104,6 +130,12 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("plugins", help="list available plugins")
     runp = sub.add_parser("run", help="run a plugin by name")
     runp.add_argument("plugin")
+    huntp = sub.add_parser("hunt", help="threat hunt: correlated ATT&CK findings "
+                                        "(sarif/json/csv/md/html)")
+    huntp.add_argument("--no-injection", action="store_true",
+                       help="skip the memory-injection scan (faster)")
+    huntp.add_argument("--yara", action="store_true",
+                       help="also scan suspect processes with YARA rules")
 
     args = ap.parse_args(argv)
 
@@ -116,14 +148,21 @@ def main(argv: list[str] | None = None) -> int:
     count = max(args.count, 1)
 
     def one_capture(index: int) -> None:
-        if args.command == "run":
+        if args.command == "hunt":
+            content, _ext = _hunt(args.format, not args.no_injection, args.yara)
+            _emit(content, args.out, index, count)
+        elif args.command == "run":
             ok, content = plugins.run_plugin(args.plugin)
             if not ok:
                 print(content, file=sys.stderr)
                 return
             _emit(content, args.out, index, count)
         else:
-            content, _ext = _gen(args.command, args.format)
+            try:
+                content, _ext = _gen(args.command, args.format)
+            except ValueError as exc:
+                print(f"aetheris-cli: {exc}", file=sys.stderr)
+                raise SystemExit(2) from exc
             _emit(content, args.out, index, count)
 
     for i in range(count):

@@ -16,6 +16,7 @@ The XML parser and the suspicion heuristics are pure and unit-tested off-Windows
 """
 from __future__ import annotations
 
+import ntpath
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -129,7 +130,8 @@ def is_suspicious(task: TaskInfo) -> bool:
 
 
 def resolve_binary(command: str) -> str:
-    return os.path.expandvars((command or "").strip().strip('"'))
+    # Task commands are Windows paths; ntpath expands %VAR% on any host.
+    return ntpath.expandvars((command or "").strip().strip('"'))
 
 
 def _read_task_xml(path: str) -> str | None:

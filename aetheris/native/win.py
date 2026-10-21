@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import ctypes
 import struct
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar
@@ -196,24 +197,44 @@ def _grow(call: Callable[[Any, int], Any], ctype: type[_CT],
     Call ``call(buffer, capacity)`` with a buffer that doubles until it holds
     the whole result. Returns ``(buffer, count)``; a negative count from the
     engine is passed straight through for the caller to interpret.
+
+    A result that still fills the buffer at ``hard_max`` may be truncated.
+    That is logged rather than returned silently: a forensics sweep that has
+    quietly dropped rows is worse than one that says it might have.
     """
     cap = start
     while True:
         buf = (ctype * cap)()
         n = int(call(buf, cap))
-        if n < 0 or n < cap or cap >= hard_max:
+        if n < 0 or n < cap:
+            return buf, n
+        if cap >= hard_max:
+            logbus.warn(SRC, f"{ctype.__name__} result filled the {hard_max}-row cap; "
+                             "rows beyond it may be missing")
             return buf, n
         cap = min(cap * 2, hard_max)
 
+
 _lib: ctypes.CDLL | None = None
 _tried = False
+# Workers call into the engine from several threads at once. Without the lock
+# a second thread arriving mid-load would see _tried set but _lib still None
+# and silently take the "engine absent" path for that call.
+_load_lock = threading.Lock()
 
 
 def _load() -> ctypes.CDLL | None:
     global _lib, _tried
     if _tried:
         return _lib
-    _tried = True
+    with _load_lock:
+        if not _tried:
+            _lib = _bind()
+            _tried = True
+    return _lib
+
+
+def _bind() -> ctypes.CDLL | None:
     lib = loader.load("aetheris_win", "aw_abi_version")
     if lib is not None:
         # The ABI check should already have rejected a library missing any of
@@ -229,8 +250,7 @@ def _load() -> ctypes.CDLL | None:
             logbus.warn(SRC, "aetheris_win.dll is missing an expected export; "
                              "using Python fallbacks", str(exc))
             lib = None
-    _lib = lib
-    return _lib
+    return lib
 
 
 def available() -> bool:
@@ -241,7 +261,8 @@ def available() -> bool:
 def reset() -> None:
     """Drop the cached handle. For tests that force the fallback path."""
     global _lib, _tried
-    _lib, _tried = None, False
+    with _load_lock:
+        _lib, _tried = None, False
     loader.reset()
 
 
@@ -382,7 +403,9 @@ def find_handles_by_name(target: str, pids: set[int] | None = None,
     Every handle whose object name equals ``target`` (case-insensitive; give an
     NT device path such as ``\\Device\\HarddiskVolume3\\dir\\file``).
 
-    None means the engine is absent so the caller should fall back. The search
+    None means no answer from here -- the engine is absent, or it refused or
+    failed the search -- so the caller should fall back. An engine error must
+    not come back as [], which would read as "nothing holds this file". The search
     runs entirely inside the engine: doing it from Python costs one FFI call
     per handle across a table of six figures, which is why the Python original
     had to be given a PID set to stay tractable.
@@ -408,7 +431,8 @@ def find_handles_by_name(target: str, pids: set[int] | None = None,
         _AwHandleRaw, 256, 65536,
     )
     if n < 0:
-        return []
+        logbus.trace(SRC, f"native handle search failed ({n}); falling back")
+        return None
     return [
         HandleEntry(pid=buf[i].pid, handle=buf[i].handle, object=buf[i].object,
                     granted_access=buf[i].granted_access, attributes=buf[i].attributes,
@@ -701,20 +725,42 @@ def reg_snapshot(root: str, subkey: str, max_depth: int = 6
     finally:
         lib.aw_reg_free(ptr)
 
+    out = _decode_reg_blob(blob)
+    if out is None:
+        logbus.warn(SRC, "native registry snapshot was malformed; "
+                         "using the Python walk instead")
+    return out
+
+
+def _decode_reg_blob(blob: bytes) -> dict[str, dict[str, RegValue]] | None:
+    """
+    Decode the engine's packed snapshot, or None if it is malformed.
+
+    Every length is bounds-checked. A truncated or corrupt blob must not be
+    half-decoded: these snapshots are diffed against each other, so a partial
+    one would surface as a wall of phantom "removed" rows. None hands the walk
+    back to the Python path instead.
+    """
     out: dict[str, dict[str, RegValue]] = {}
     pos, end = 0, len(blob)
     unpack_key, unpack_val = _REG_HEAD_KEY.unpack_from, _REG_HEAD_VAL.unpack_from
-    while pos + 8 <= end:
+    while pos < end:
+        if pos + 8 > end:
+            return None
         key_bytes, count = unpack_key(blob, pos)
         pos += 8
+        if pos + key_bytes > end:
+            return None
         key = blob[pos:pos + key_bytes].decode("utf-16-le", "replace")
         pos += key_bytes
         values: dict[str, RegValue] = {}
         for _ in range(count):
             if pos + 12 > end:
-                break
+                return None
             name_bytes, vtype, data_bytes = unpack_val(blob, pos)
             pos += 12
+            if pos + name_bytes + data_bytes > end:
+                return None
             name = blob[pos:pos + name_bytes].decode("utf-16-le", "replace")
             pos += name_bytes
             data = blob[pos:pos + data_bytes]
