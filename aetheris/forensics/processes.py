@@ -21,7 +21,7 @@ from typing import Any
 
 import psutil
 
-from ..core import dryrun, logbus, signing
+from ..core import dryrun, logbus, safety, signing
 from ..core import winapi as W
 from ..native import win as nativewin
 
@@ -41,6 +41,10 @@ class ProcessInfo:
     dep: str = "unknown"
     aslr: str = "unknown"
     signature: str = "unchecked"
+    # Lineage, for attack storylines ("chrome.exe started upd.exe at 14:02").
+    ppid: int = 0
+    create_time: float = 0.0
+    cmdline: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -95,6 +99,17 @@ def _query_mitigations(pid: int) -> tuple[str, str]:
         W.kernel32.CloseHandle(h)
 
 
+_CMDLINE_MAX = 2048
+
+
+def _join_cmdline(parts: Any) -> str:
+    """psutil gives argv as a list (or None when access is denied)."""
+    if not parts:
+        return ""
+    text = " ".join(str(p) for p in parts)
+    return text if len(text) <= _CMDLINE_MAX else text[: _CMDLINE_MAX - 1] + "…"
+
+
 def snapshot(enrich: bool = False, sign: bool = False) -> list[ProcessInfo]:
     """
     Return a list of ProcessInfo for all visible processes.
@@ -105,7 +120,7 @@ def snapshot(enrich: bool = False, sign: bool = False) -> list[ProcessInfo]:
     out: list[ProcessInfo] = []
     for p in psutil.process_iter(
         ["pid", "name", "username", "exe", "cpu_percent",
-         "memory_info", "num_threads", "status"]
+         "memory_info", "num_threads", "status", "ppid", "create_time", "cmdline"]
     ):
         try:
             info = p.info
@@ -119,6 +134,9 @@ def snapshot(enrich: bool = False, sign: bool = False) -> list[ProcessInfo]:
                 mem_rss=getattr(mem, "rss", 0) if mem else 0,
                 num_threads=info.get("num_threads") or 0,
                 status=info.get("status") or "?",
+                ppid=info.get("ppid") or 0,
+                create_time=info.get("create_time") or 0.0,
+                cmdline=_join_cmdline(info.get("cmdline")),
             )
             if enrich:
                 pi.dep, pi.aslr = _query_mitigations(pi.pid)
@@ -148,6 +166,54 @@ def kill(pid: int) -> tuple[bool, str]:
         return False, "no such process"
     except psutil.AccessDenied:
         return False, "access denied (need elevation / SeDebugPrivilege)"
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+
+
+def suspend(pid: int) -> tuple[bool, str]:
+    """Freeze every thread of a process -- the reversible alternative to kill.
+
+    Registers its own undo (resume) on the rollback ledger, guarded by the
+    process start time so a recycled pid is never resumed by mistake.
+    """
+    if dryrun.skip(SRC, f"suspend pid {pid}"):
+        return True, f"[dry-run] would suspend pid {pid}"
+    try:
+        p = psutil.Process(pid)
+        name, started = p.name(), p.create_time()
+        p.suspend()
+    except psutil.NoSuchProcess:
+        return False, "no such process"
+    except psutil.AccessDenied:
+        return False, "access denied (need elevation / SeDebugPrivilege)"
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+    safety.ledger.register(f"suspend {name} (pid {pid})",
+                           lambda: _resume_checked(pid, started))
+    logbus.action(SRC, f"suspended pid {pid} ({name})")
+    return True, f"suspended {name} (pid {pid})"
+
+
+def _resume_checked(pid: int, started: float) -> None:
+    p = psutil.Process(pid)
+    if abs(p.create_time() - started) > 0.01:
+        raise RuntimeError(f"pid {pid} now belongs to a different process; not resuming")
+    p.resume()
+    logbus.action(SRC, f"resumed pid {pid}")
+
+
+def resume(pid: int) -> tuple[bool, str]:
+    """Resume a suspended process (for manual use; undo uses _resume_checked)."""
+    if dryrun.skip(SRC, f"resume pid {pid}"):
+        return True, f"[dry-run] would resume pid {pid}"
+    try:
+        p = psutil.Process(pid)
+        p.resume()
+        return True, f"resumed {p.name()} (pid {pid})"
+    except psutil.NoSuchProcess:
+        return False, "no such process"
+    except psutil.AccessDenied:
+        return False, "access denied"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
 
