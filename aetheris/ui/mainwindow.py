@@ -35,10 +35,12 @@ from .tabs.autoshell_tab import AutoShellTab
 from .tabs.debugger_tab import DebuggerTab
 from .tabs.dma_tab import DmaTab
 from .tabs.findings_tab import FindingsTab
+from .tabs.health_tab import HealthTab
 from .tabs.memory_tab import MemoryTab
 from .tabs.network_tab import NetworkTab
 from .tabs.plugins_tab import PluginsTab
 from .tabs.shell_tab import ShellTab
+from .tabs.startup_tab import StartupTab
 from .tabs.storage_tab import StorageTab
 from .tabs.timeline_tab import TimelineTab
 from .theme import QSS
@@ -279,6 +281,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(DebuggerTab(), "⑧  Debugger")
         self.tabs.addTab(ApiMonitorTab(), "⑨  API Monitor")
         self.tabs.addTab(FindingsTab(), "🎯  Threat Hunt")
+        self.tabs.addTab(HealthTab(), "🩺  System Health")
+        self.tabs.addTab(StartupTab(), "🚀  Startup Impact")
         self.tabs.addTab(PluginsTab(), "⚙  Plugins")
         self.setCentralWidget(self.tabs)
 
