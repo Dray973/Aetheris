@@ -32,6 +32,7 @@ from .logdrawer import LogDrawer
 from .tabdeck import TabDeck
 from .tabs.apimonitor_tab import ApiMonitorTab
 from .tabs.autoshell_tab import AutoShellTab
+from .tabs.cert_tab import CertTab
 from .tabs.debugger_tab import DebuggerTab
 from .tabs.dma_tab import DmaTab
 from .tabs.findings_tab import FindingsTab
@@ -283,6 +284,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(FindingsTab(), "🎯  Threat Hunt")
         self.tabs.addTab(HealthTab(), "🩺  System Health")
         self.tabs.addTab(StartupTab(), "🚀  Startup Impact")
+        self.tabs.addTab(CertTab(), "🔐  Certificate & Trust")
         self.tabs.addTab(PluginsTab(), "⚙  Plugins")
         self.setCentralWidget(self.tabs)
 
